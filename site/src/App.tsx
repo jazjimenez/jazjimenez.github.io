@@ -1,0 +1,321 @@
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { letterboxd, papers, profile, roomExtras, TMDB_CREDIT } from './data/content'
+import Desktop, { type AppId } from './desktop/Desktop'
+import { isManilaNight, useManilaClock, useManilaWeather } from './hooks/useManila'
+import Plain from './plain/Plain'
+import type { RoomExtraKey } from './room/Room'
+import type { FocusId } from './room/screenPortal'
+import { PORTAL_ID } from './room/portalId'
+
+const Room = lazy(() => import('./room/Room'))
+
+// entering/leaving: the camera is leaning in to (or back from) the laptop, with the desktop on its screen
+// landing: welcome page over a third-person view of the room (scroll down for the simple version)
+// arriving: flying in to the chair
+type View = 'landing' | 'arriving' | 'room' | 'entering' | 'desktop' | 'leaving'
+
+const RESUME_URL = `${import.meta.env.BASE_URL}${profile.resume}`
+
+function hasWebGL() {
+  try {
+    return !!document.createElement('canvas').getContext('webgl2')
+  } catch {
+    return false
+  }
+}
+
+export default function App() {
+  const webgl = useState(hasWebGL)[0]
+  const [view, setView] = useState<View>(() => {
+    if (location.hash === '#laptop') return 'desktop' // shareable link straight to the laptop
+    if (location.hash === '#room') return 'room' // skip the welcome page
+    return 'landing'
+  })
+  const [nightOverride, setNightOverride] = useState<boolean | null>(null)
+  const [look, setLook] = useState(1) // 0 left · 1 center (desk) · 2 right
+  const [focus, setFocus] = useState<FocusId | null>(null) // zoomed in on the corkboard
+  const turn = (dir: -1 | 1) => {
+    if (!focus) setLook((l) => Math.min(2, Math.max(0, l + dir)))
+  }
+  const [extra, setExtra] = useState<RoomExtraKey | null>(null)
+  const [initialApp, setInitialApp] = useState<AppId | undefined>()
+  const clock = useManilaClock()
+  const weather = useManilaWeather()
+  const night = nightOverride ?? isManilaNight(clock.now)
+  const [cozyPick, setCozy] = useState(false)
+  const cozy = night && cozyPick
+  // landing page scroll: the simple version lives below the welcome screen
+  const scroller = useRef<HTMLDivElement>(null)
+  const [simpleInView, setSimpleInView] = useState(false)
+  const [wantSimple, setWantSimple] = useState(() => location.hash === '#simple')
+  const scrollToSimple = () => document.getElementById('simple')?.scrollIntoView({ behavior: 'smooth' })
+
+
+  useEffect(() => {
+    const hash = view === 'desktop' ? '#laptop' : view === 'room' ? '#room' : view === 'landing' && simpleInView ? '#simple' : ''
+    if (location.hash !== hash) history.replaceState(null, '', hash || location.pathname + location.search)
+  }, [view, simpleInView])
+
+  // arriving at the landing page asking for the simple version (#simple link or "Simple version" in the room)
+  useEffect(() => {
+    if (view !== 'landing' || !wantSimple) return
+    const id = requestAnimationFrame(() => {
+      document.getElementById('simple')?.scrollIntoView()
+      setWantSimple(false)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [view, wantSimple])
+
+  // Stop drawing the 3D room while the simple version covers it.
+  const onLandingScroll = () => {
+    const el = scroller.current
+    if (el) setSimpleInView(el.scrollTop > el.clientHeight * 0.6)
+  }
+
+  // Escape steps back out of the corkboard close-up; leaving the room resets it.
+  useEffect(() => {
+    if (!focus) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setFocus(null)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [focus])
+  useEffect(() => {
+    if (view !== 'room') setFocus(null)
+  }, [view])
+
+  const goToLaptop = (app?: AppId) => {
+    setExtra(null)
+    setFocus(null)
+    setInitialApp(app)
+    setView('entering')
+  }
+
+  // Safety net: if the 3D room isn't ready to animate the way back (e.g. still loading), don't get stuck.
+  useEffect(() => {
+    if (view !== 'leaving') return
+    const id = setTimeout(() => setView('room'), 4000)
+    return () => clearTimeout(id)
+  }, [view])
+
+  // No WebGL: just the simple version.
+  if (!webgl) return <Plain webgl={false} onEnterRoom={() => {}} />
+
+  const card = extra ? roomExtras[extra] : null
+
+  return (
+    <div className={`app${night ? ' app--night' : ''}`}>
+      <div className="stage">
+        <Suspense fallback={<div className="loading">Fixing up the room…</div>}>
+          <Room
+            night={night}
+            cozy={cozy}
+            onLamp={() => {
+              // daytime: jump straight to a cozy night; at night: toggle the big light
+              if (!night) {
+                setNightOverride(true)
+                setCozy(true)
+              } else setCozy(!cozyPick)
+            }}
+            rainy={!!weather?.rainy}
+            paused={view === 'desktop' || (view === 'landing' && simpleInView)}
+            laptopMode={view === 'entering' || view === 'leaving' ? view : view === 'desktop' ? 'inside' : 'seat'}
+            intro={view === 'landing' ? 'landing' : view === 'arriving' ? 'arriving' : 'done'}
+            onArrived={() => setView('room')}
+            onEnteredLaptop={() => setView('desktop')}
+            onLeftLaptop={() => {
+              setInitialApp(undefined)
+              setView('room')
+            }}
+            onOpenLaptop={() => goToLaptop()}
+            onOpenCredentials={() => goToLaptop('credentials')}
+            onToggleNight={() => {
+              setNightOverride(!night)
+              setCozy(false)
+            }}
+            onExtra={setExtra}
+            focus={focus}
+            onFocus={(f) => {
+              setExtra(null)
+              setFocus(f)
+            }}
+            look={look}
+            onLookRequest={turn}
+          />
+        </Suspense>
+      </div>
+
+      {view === 'landing' && (
+        <div className="landing-scroll" ref={scroller} onScroll={onLandingScroll}>
+        <section className="welcome" aria-label="Welcome">
+          <div className="welcome__card">
+            <div className="welcome__eyebrow">Mabuhay! Welcome to</div>
+            <h1 className="welcome__title" lang="tl">
+              Kwarto ni Jaztin
+            </h1>
+            <div className="welcome__translation">
+              <span lang="tl">kwarto</span> (n.) · room — &ldquo;Jaztin&rsquo;s room&rdquo;
+            </div>
+            <p className="welcome__lede">{profile.headline}</p>
+            <p className="welcome__text">
+              Step inside, take a seat at my desk, and open the computer to see my projects and research. Look around, too: a few things in the room
+              have stories.
+            </p>
+            <div className="welcome__actions">
+              <button className="btn btn--primary btn--big" onClick={() => setView('arriving')} autoFocus>
+                Enter the room →
+              </button>
+              <a className="btn btn--glass" href={RESUME_URL} target="_blank" rel="noreferrer">
+                Resume
+              </a>
+            </div>
+          </div>
+          <div className="welcome__foot">Built with three.js · lighting baked in Blender · {profile.location}</div>
+          <button className="welcome__more" onClick={scrollToSimple}>
+            <span>Simple version</span>
+            <span className="welcome__chevron" aria-hidden>
+              ⌄
+            </span>
+          </button>
+        </section>
+        <section id="simple" className="simple-section" aria-label="Simple version">
+          <Plain
+            webgl
+            onEnterRoom={() => {
+              scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })
+              setTimeout(() => setView('arriving'), 450)
+            }}
+          />
+        </section>
+        </div>
+      )}
+
+      {view === 'room' && (
+        <>
+          <header className="hud hud--top">
+            <div className="nametag">
+              <div className="nametag__name">{profile.name}</div>
+              <div className="nametag__role">Backend &amp; databases · Filipino NLP</div>
+            </div>
+            <div className="hud__actions">
+              <a className="btn btn--glass" href={RESUME_URL} target="_blank" rel="noreferrer">
+                Resume
+              </a>
+              <button
+                className="btn btn--glass"
+                onClick={() => {
+                  setWantSimple(true)
+                  setView('landing')
+                }}
+              >
+                Simple version
+              </button>
+            </div>
+          </header>
+          {focus ? (
+            <>
+              <button className="btn btn--glass focus-back" onClick={() => setFocus(null)} autoFocus>
+                ← Back
+              </button>
+              <div className="hud hud--bottom">
+                <span className="hint">My corkboard · Esc to step back</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <button className="look look--left" onClick={() => turn(-1)} disabled={look === 0} aria-label="Look left">
+                ‹
+              </button>
+              <button className="look look--right" onClick={() => turn(1)} disabled={look === 2} aria-label="Look right">
+                ›
+              </button>
+              <div className="look-dots" aria-hidden>
+                {[0, 1, 2].map((i) => (
+                  <span key={i} className={i === look ? 'look-dot look-dot--on' : 'look-dot'} />
+                ))}
+              </div>
+              <div className="hud hud--bottom">
+                <span className="hint">
+                  <span className="hint--mouse">‹ › or rest at the edge to look around</span>
+                  <span className="hint--touch">Swipe to look around</span> · click things · the computer has everything
+                </span>
+              </div>
+            </>
+          )}
+          {card && extra && (
+            <aside className="extra" role="dialog" aria-label={card.title}>
+              <button className="extra__close" onClick={() => setExtra(null)} aria-label="Close">
+                ×
+              </button>
+              <h3>{card.title}</h3>
+              {card.lines.map((l) => (
+                <p key={l}>{l}</p>
+              ))}
+              {extra === 'papers' && (
+                <ul className="extra__papers">
+                  {papers.map((pp) => (
+                    <li key={pp.title}>
+                      <div className="extra__paper-title">{pp.title}</div>
+                      <div className="muted">
+                        {pp.venue}
+                        {pp.status ? ` · ${pp.status}` : ''}
+                      </div>
+                      <div className="extra__paper-authors">{pp.authors}</div>
+                      {pp.links.length > 0 && (
+                        <div className="extra__paper-links">
+                          {pp.links.map((l) => (
+                            <a key={l.url} href={l.url} target="_blank" rel="noreferrer">
+                              {l.label} ↗
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {extra === 'films' && (
+                <ol className="extra__films">
+                  {letterboxd.favorites.map((f) => (
+                    <li key={f.url}>
+                      <a href={f.url} target="_blank" rel="noreferrer">
+                        {f.title}
+                      </a>{' '}
+                      <span className="muted">({f.year})</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {extra === 'films' && (
+                <a className="btn btn--primary" href={letterboxd.profile} target="_blank" rel="noreferrer">
+                  My Letterboxd ↗
+                </a>
+              )}
+              {extra === 'films' && <p className="extra__credit">{TMDB_CREDIT}</p>}
+              {extra === 'jeepney' && (
+                <button className="btn btn--primary" onClick={() => goToLaptop()}>
+                  Sakay na → laptop
+                </button>
+              )}
+              {(extra === 'films' || extra === 'music') && (
+                <button className="btn" onClick={() => goToLaptop('films')}>
+                  Open Films on the laptop
+                </button>
+              )}
+            </aside>
+          )}
+        </>
+      )}
+
+      {(view === 'entering' || view === 'desktop' || view === 'leaving') && (
+        // The 3D rig maps this onto the laptop screen during entering/leaving (see room/screenPortal.ts).
+        <div
+          id={PORTAL_ID}
+          className={`screen-portal${view === 'desktop' ? '' : ' screen-portal--moving'}`}
+          style={view === 'entering' ? { opacity: 0 } : undefined}
+        >
+          <Desktop clock={clock.label} weather={weather} night={night} initialApp={initialApp} onExit={() => setView('leaving')} />
+        </div>
+      )}
+    </div>
+  )
+}
