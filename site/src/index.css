@@ -138,8 +138,6 @@ code,
 .stage {
   position: absolute;
   inset: 0;
-  /* falls back and away as the simple version rises over it (transform set from App) */
-  transform-origin: 50% 40%;
 }
 .loading {
   display: grid;
@@ -306,7 +304,6 @@ code,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stage,
   .simple-section,
   .welcome__card {
     transform: none !important;

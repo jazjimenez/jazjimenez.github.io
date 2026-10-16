@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { letterboxd, papers, profile, roomExtras, TMDB_CREDIT } from './data/content'
 import Desktop, { type AppId } from './desktop/Desktop'
+import { setLandingPaused } from './room/landingMotion'
 import { isManilaNight, useManilaClock, useManilaWeather } from './hooks/useManila'
 import Plain from './plain/Plain'
 import type { RoomExtraKey } from './room/Room'
@@ -26,12 +27,11 @@ function hasWebGL() {
 
 /** Eased scroll (slower and more decisive than the browser's smooth scroll). Calls `done` when it lands. */
 let gliding = false
-/** Told when a glide starts, so the 3D room can stop drawing before the first frame moves. */
-let onGlideStart: ((top: number) => void) | null = null
 function glideTo(el: HTMLElement, top: number, done?: () => void, ms = 1050) {
-  onGlideStart?.(top)
+  if (top > 0) setLandingPaused(true) // stop drawing the room before the first frame moves
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     el.scrollTop = top
+    setLandingPaused(top > 0)
     return void done?.()
   }
   const from = el.scrollTop
@@ -46,6 +46,7 @@ function glideTo(el: HTMLElement, top: number, done?: () => void, ms = 1050) {
     if (t < 1) return void requestAnimationFrame(step)
     el.style.scrollBehavior = ''
     gliding = false
+    if (top <= 0) setLandingPaused(false) // back on the welcome screen: the room drifts again
     done?.()
   }
   requestAnimationFrame(step)
@@ -161,8 +162,7 @@ function applyLandingProgress(app: HTMLElement, p: number) {
     if (opacity !== null) el.style.opacity = String(Math.max(0, Math.min(1, opacity)))
   }
   const vh = app.clientHeight / 100
-  // the room falls back and away
-  set(q('.stage'), p ? `translate3d(0, ${(-8 * vh * p).toFixed(1)}px, 0) scale(${(1 - 0.18 * p).toFixed(4)})` : '', null)
+  // the room stays put and simply dims behind the rising sheet
   set(q('.landing-dim'), null, 0.95 * p)
   // the welcome text shoots up, shrinks and fades
   set(q('.welcome__card'), `translate3d(0, ${(-28 * vh * p).toFixed(1)}px, 0) scale(${(1 - 0.16 * p).toFixed(4)})`, 1 - 2 * p)
@@ -171,6 +171,10 @@ function applyLandingProgress(app: HTMLElement, p: number) {
   // the simple version rises as a card and grows to full width
   set(q('.simple-section'), `scale(${(0.86 + 0.14 * p).toFixed(4)})`, null)
   set(q('.simple-section__handle'), null, (1 - p) * 0.25)
+}
+
+function setHash(hash: string) {
+  if (location.hash !== hash) history.replaceState(null, '', hash || location.pathname + location.search)
 }
 
 export default function App() {
@@ -195,15 +199,9 @@ export default function App() {
   const cozy = night && cozyPick
   // landing page scroll: the simple version lives below the welcome screen
   const scroller = useRef<HTMLDivElement>(null)
-  const [simpleInView, setSimpleInView] = useState(false)
-  const [landingMoved, setLandingMoved] = useState(false) // scrolled off the welcome screen at all
   const [wantSimple, setWantSimple] = useState(() => location.hash === '#simple')
   const appRef = useRef<HTMLDivElement>(null)
   useLandingSnap(scroller, view === 'landing')
-  useEffect(() => {
-    onGlideStart = (top) => top > 0 && setLandingMoved(true)
-    return () => void (onGlideStart = null)
-  }, [])
   const scrollToSimple = () => {
     const el = scroller.current
     const target = document.getElementById('simple')
@@ -212,9 +210,10 @@ export default function App() {
 
 
   useEffect(() => {
-    const hash = view === 'desktop' ? '#laptop' : view === 'room' ? '#room' : view === 'landing' && simpleInView ? '#simple' : ''
-    if (location.hash !== hash) history.replaceState(null, '', hash || location.pathname + location.search)
-  }, [view, simpleInView])
+    if (view === 'landing') return // the landing page sets #simple itself while scrolling
+    const hash = view === 'desktop' ? '#laptop' : view === 'room' ? '#room' : ''
+    setHash(hash)
+  }, [view])
 
   // arriving at the landing page asking for the simple version (#simple link or "Simple version" in the room)
   useEffect(() => {
@@ -242,11 +241,14 @@ export default function App() {
     if (!el || !app) return
     const p = Math.min(1, Math.max(0, el.scrollTop / el.clientHeight))
     applyLandingProgress(app, p)
-    setSimpleInView(p > 0.6)
-    setLandingMoved(p > 0.01)
+    // no React state here: re-rendering mid-scroll would hitch the animation
+    setLandingPaused(p > 0.01 || gliding)
+    setHash(p > 0.6 ? '#simple' : '')
   }
   useEffect(() => {
-    if (view !== 'landing' && appRef.current) applyLandingProgress(appRef.current, 0)
+    if (view === 'landing') return
+    if (appRef.current) applyLandingProgress(appRef.current, 0)
+    setLandingPaused(false)
   }, [view])
 
   // The simple version's sections fade up as they scroll into view.
@@ -313,7 +315,7 @@ export default function App() {
               } else setCozy(!cozyPick)
             }}
             rainy={!!weather?.rainy}
-            paused={view === 'desktop' || (view === 'landing' && landingMoved)}
+            paused={view === 'desktop'}
             laptopMode={view === 'entering' || view === 'leaving' ? view : view === 'desktop' ? 'inside' : 'seat'}
             intro={view === 'landing' ? 'landing' : view === 'arriving' ? 'arriving' : 'done'}
             onArrived={() => setView('room')}
