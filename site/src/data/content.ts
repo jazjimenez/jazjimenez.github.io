@@ -44,7 +44,36 @@ export const profile = {
   ] as Link[],
   /** Put your resume at site/public/resume.pdf */
   resume: 'resume.pdf',
+  /** The live site (used for search engines, link previews and the machine-readable profile). */
+  siteUrl: 'https://jazjimenez.github.io/',
+  /** One-paragraph summary: the first thing a recruiter (or an AI screener) reads. */
+  summary:
+    'Computer Science student at De La Salle University focused on backend development and database design, with research in Filipino natural language processing. Co-author of TagaBaybay, a rule-based system for respelling English loanwords in Filipino (paper accepted at IEEE TENCON 2026), and author of an undergraduate thesis building a Filipino-English audio-visual speech dataset pipeline.',
+  /** What you're looking for. Text in "(TODO …)" is hidden from the public page. */
+  lookingFor: 'Backend, database or data engineering roles — internship or entry-level. (TODO: confirm the role types and your availability date)',
+  spokenLanguages: ['English', 'Filipino'],
 }
+
+export type SkillGroup = { group: string; items: string[] }
+
+/** Skills, grouped. TODO: adjust to what you'd be happy to be interviewed on. */
+export const skills: SkillGroup[] = [
+  { group: 'Backend & data', items: ['Relational database design and modelling', 'SQL', 'Backend development', 'Data pipelines'] },
+  { group: 'Programming languages', items: ['Rust', 'Python', 'SQL', 'TypeScript'] },
+  { group: 'Research & NLP', items: ['Rule-based NLP', 'Grapheme-to-phoneme conversion', 'Evaluation and error analysis', 'Speech and audio-visual datasets'] },
+  { group: 'Tools', items: ['Git and GitHub', 'React', 'Three.js', 'Blender (Python scripting)'] },
+]
+
+export type Education = { school: string; degree: string; dates: string; notes?: string[] }
+
+export const education: Education[] = [
+  {
+    school: 'De La Salle University, Manila',
+    degree: 'BS Computer Science', // TODO: exact degree / specialization
+    dates: 'TODO: e.g. 2022 – 2026',
+    notes: ['Undergraduate thesis: Filipino-English audio-visual speech recognition dataset pipeline', 'Research with the MangoCats Research Group'],
+  },
+]
 
 export const projects: Project[] = [
   {
