@@ -26,7 +26,10 @@ function hasWebGL() {
 
 /** Eased scroll (slower and more decisive than the browser's smooth scroll). Calls `done` when it lands. */
 let gliding = false
+/** Told when a glide starts, so the 3D room can stop drawing before the first frame moves. */
+let onGlideStart: ((top: number) => void) | null = null
 function glideTo(el: HTMLElement, top: number, done?: () => void, ms = 1050) {
+  onGlideStart?.(top)
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     el.scrollTop = top
     return void done?.()
@@ -149,6 +152,27 @@ function useLandingSnap(scroller: React.RefObject<HTMLDivElement | null>, active
   }, [scroller, active])
 }
 
+/** Landing → simple version hand-off at progress p (0..1). Compositor-only: transform + opacity. */
+function applyLandingProgress(app: HTMLElement, p: number) {
+  const q = (sel: string) => app.querySelector<HTMLElement>(sel)
+  const set = (el: HTMLElement | null, transform: string | null, opacity: number | null) => {
+    if (!el) return
+    if (transform !== null) el.style.transform = transform
+    if (opacity !== null) el.style.opacity = String(Math.max(0, Math.min(1, opacity)))
+  }
+  const vh = app.clientHeight / 100
+  // the room falls back and away
+  set(q('.stage'), p ? `translate3d(0, ${(-8 * vh * p).toFixed(1)}px, 0) scale(${(1 - 0.18 * p).toFixed(4)})` : '', null)
+  set(q('.landing-dim'), null, 0.95 * p)
+  // the welcome text shoots up, shrinks and fades
+  set(q('.welcome__card'), `translate3d(0, ${(-28 * vh * p).toFixed(1)}px, 0) scale(${(1 - 0.16 * p).toFixed(4)})`, 1 - 2 * p)
+  set(q('.welcome__more'), null, 1 - 5 * p)
+  set(q('.welcome__foot'), null, 1 - 5 * p)
+  // the simple version rises as a card and grows to full width
+  set(q('.simple-section'), `scale(${(0.86 + 0.14 * p).toFixed(4)})`, null)
+  set(q('.simple-section__handle'), null, (1 - p) * 0.25)
+}
+
 export default function App() {
   const webgl = useState(hasWebGL)[0]
   const [view, setView] = useState<View>(() => {
@@ -172,9 +196,14 @@ export default function App() {
   // landing page scroll: the simple version lives below the welcome screen
   const scroller = useRef<HTMLDivElement>(null)
   const [simpleInView, setSimpleInView] = useState(false)
+  const [landingMoved, setLandingMoved] = useState(false) // scrolled off the welcome screen at all
   const [wantSimple, setWantSimple] = useState(() => location.hash === '#simple')
   const appRef = useRef<HTMLDivElement>(null)
   useLandingSnap(scroller, view === 'landing')
+  useEffect(() => {
+    onGlideStart = (top) => top > 0 && setLandingMoved(true)
+    return () => void (onGlideStart = null)
+  }, [])
   const scrollToSimple = () => {
     const el = scroller.current
     const target = document.getElementById('simple')
@@ -204,17 +233,20 @@ export default function App() {
     return () => cancelAnimationFrame(id)
   }, [view, wantSimple])
 
-  // Scroll progress from the welcome screen (0) to the simple version (1) drives the hand-off
-  // in CSS (--p). The 3D room stops drawing once the simple version covers it.
+  // Scroll progress from the welcome screen (0) to the simple version (1) drives the hand-off.
+  // Only transform and opacity are touched, on a handful of layers, so the GPU composites each frame
+  // without re-laying out or repainting the page. The 3D room stops drawing as soon as you scroll.
   const onLandingScroll = () => {
     const el = scroller.current
-    if (!el) return
+    const app = appRef.current
+    if (!el || !app) return
     const p = Math.min(1, Math.max(0, el.scrollTop / el.clientHeight))
-    appRef.current?.style.setProperty('--p', p.toFixed(4))
+    applyLandingProgress(app, p)
     setSimpleInView(p > 0.6)
+    setLandingMoved(p > 0.01)
   }
   useEffect(() => {
-    if (view !== 'landing') appRef.current?.style.setProperty('--p', '0')
+    if (view !== 'landing' && appRef.current) applyLandingProgress(appRef.current, 0)
   }, [view])
 
   // The simple version's sections fade up as they scroll into view.
@@ -281,7 +313,7 @@ export default function App() {
               } else setCozy(!cozyPick)
             }}
             rainy={!!weather?.rainy}
-            paused={view === 'desktop' || (view === 'landing' && simpleInView)}
+            paused={view === 'desktop' || (view === 'landing' && landingMoved)}
             laptopMode={view === 'entering' || view === 'leaving' ? view : view === 'desktop' ? 'inside' : 'seat'}
             intro={view === 'landing' ? 'landing' : view === 'arriving' ? 'arriving' : 'done'}
             onArrived={() => setView('room')}
@@ -343,6 +375,7 @@ export default function App() {
           </button>
         </section>
         <section id="simple" className="simple-section" aria-label="Simple version">
+          <div className="simple-section__handle" aria-hidden />
           <Plain
             webgl
             onEnterRoom={() => {

@@ -66,6 +66,7 @@ export default function FirstPersonRig({
   const pitchTurn = useRef({ from: LOOK_PITCHES[look] as number, to: LOOK_PITCHES[look] as number })
   const pointer = useRef({ x: 0, y: 0, overCanvas: false, edgeSince: 0, edgeFired: false })
   const swipe = useRef<{ x: number; done: boolean } | null>(null)
+  const landingTime = useRef(0)
   const pitchOffset = useRef(0)
   const lean = useRef({ t: 0, done: false, haveSeat: false })
   const arrive = useRef({ t: 0, done: false, fromPos: new THREE.Vector3(), fromQ: new THREE.Quaternion() })
@@ -293,7 +294,8 @@ export default function FirstPersonRig({
 
     // ---- welcome page: slow drift around the dollhouse view ----
     if (intro === 'landing') {
-      const t = state.clock.elapsedTime
+      // own clock (dt is clamped), so pausing the room while you scroll doesn't make the drift jump
+      const t = (landingTime.current += dt)
       const drift = Math.sin(t * 0.18) * 0.35
       tmp.look.copy(landingPos).sub(LANDING_TARGET).applyAxisAngle(camera.up, drift).add(LANDING_TARGET)
       tmp.look.y += Math.sin(t * 0.23) * 0.15
