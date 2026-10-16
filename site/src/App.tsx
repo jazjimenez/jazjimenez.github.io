@@ -24,6 +24,23 @@ function hasWebGL() {
   }
 }
 
+/** Eased scroll (slower and softer than the browser's smooth scroll). */
+function glideTo(el: HTMLElement, top: number, ms = 1000) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return void (el.scrollTop = top)
+  const from = el.scrollTop
+  const start = performance.now()
+  el.style.scrollSnapType = 'none' // don't let snapping fight the glide
+  el.style.scrollBehavior = 'auto'
+  const step = (now: number) => {
+    const t = Math.min(1, (now - start) / ms)
+    const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+    el.scrollTop = from + (top - from) * e
+    if (t < 1) requestAnimationFrame(step)
+    else el.style.scrollSnapType = el.style.scrollBehavior = ''
+  }
+  requestAnimationFrame(step)
+}
+
 export default function App() {
   const webgl = useState(hasWebGL)[0]
   const [view, setView] = useState<View>(() => {
@@ -48,7 +65,12 @@ export default function App() {
   const scroller = useRef<HTMLDivElement>(null)
   const [simpleInView, setSimpleInView] = useState(false)
   const [wantSimple, setWantSimple] = useState(() => location.hash === '#simple')
-  const scrollToSimple = () => document.getElementById('simple')?.scrollIntoView({ behavior: 'smooth' })
+  const appRef = useRef<HTMLDivElement>(null)
+  const scrollToSimple = () => {
+    const el = scroller.current
+    const target = document.getElementById('simple')
+    if (el && target) glideTo(el, target.offsetTop)
+  }
 
 
   useEffect(() => {
@@ -66,11 +88,37 @@ export default function App() {
     return () => cancelAnimationFrame(id)
   }, [view, wantSimple])
 
-  // Stop drawing the 3D room while the simple version covers it.
+  // Scroll progress from the welcome screen (0) to the simple version (1) drives the hand-off
+  // in CSS (--p). The 3D room stops drawing once the simple version covers it.
   const onLandingScroll = () => {
     const el = scroller.current
-    if (el) setSimpleInView(el.scrollTop > el.clientHeight * 0.6)
+    if (!el) return
+    const p = Math.min(1, Math.max(0, el.scrollTop / el.clientHeight))
+    appRef.current?.style.setProperty('--p', p.toFixed(4))
+    setSimpleInView(p > 0.6)
   }
+  useEffect(() => {
+    if (view !== 'landing') appRef.current?.style.setProperty('--p', '0')
+  }, [view])
+
+  // The simple version's sections fade up as they scroll into view.
+  useEffect(() => {
+    const root = scroller.current
+    if (view !== 'landing' || !root) return
+    const items = root.querySelectorAll('.simple-section .plain > *')
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries)
+          if (e.isIntersecting) {
+            e.target.classList.add('is-in')
+            io.unobserve(e.target)
+          }
+      },
+      { root, threshold: 0.12 },
+    )
+    items.forEach((i) => io.observe(i))
+    return () => io.disconnect()
+  }, [view])
 
   // Escape steps back out of the corkboard close-up; leaving the room resets it.
   useEffect(() => {
@@ -103,7 +151,7 @@ export default function App() {
   const card = extra ? roomExtras[extra] : null
 
   return (
-    <div className={`app${night ? ' app--night' : ''}`}>
+    <div className={`app${night ? ' app--night' : ''}`} ref={appRef}>
       <div className="stage">
         <Suspense fallback={<div className="loading">Fixing up the room…</div>}>
           <Room
@@ -144,6 +192,7 @@ export default function App() {
         </Suspense>
       </div>
 
+      {view === 'landing' && <div className="landing-dim" aria-hidden />}
       {view === 'landing' && (
         <div className="landing-scroll" ref={scroller} onScroll={onLandingScroll}>
         <section className="welcome" aria-label="Welcome">
@@ -181,8 +230,8 @@ export default function App() {
           <Plain
             webgl
             onEnterRoom={() => {
-              scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })
-              setTimeout(() => setView('arriving'), 450)
+              if (scroller.current) glideTo(scroller.current, 0)
+              setTimeout(() => setView('arriving'), 900)
             }}
           />
         </section>

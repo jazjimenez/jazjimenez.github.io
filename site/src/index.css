@@ -134,6 +134,7 @@ code,
 /* ---------- room view ---------- */
 
 .app {
+  --p: 0; /* landing → simple version scroll progress, set from App */
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -141,6 +142,9 @@ code,
 .stage {
   position: absolute;
   inset: 0;
+  /* the room eases back as the simple version rises over it */
+  transform: scale(calc(1 - var(--p) * 0.06));
+  transform-origin: 50% 40%;
 }
 .loading {
   display: grid;
@@ -256,13 +260,76 @@ code,
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
+  scroll-snap-type: y proximity;
 }
+.landing-dim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 100%, var(--bg) 0%, #120e16 70%);
+  opacity: calc(var(--p) * 0.92);
+  pointer-events: none;
+}
+.welcome,
+.simple-section {
+  scroll-snap-align: start;
+}
+/* a sheet that rises over the room: inset with rounded corners, flattening as it reaches the top */
 .simple-section {
   position: relative;
   min-height: 100vh;
   background: var(--bg);
-  border-radius: 22px 22px 0 0;
-  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.35);
+  border-radius: calc((1 - var(--p)) * 28px) calc((1 - var(--p)) * 28px) 0 0;
+  box-shadow: 0 -24px 70px rgba(0, 0, 0, calc(0.45 - var(--p) * 0.3));
+  transform: scale(calc(0.94 + var(--p) * 0.06));
+  transform-origin: 50% 0;
+}
+.simple-section::before {
+  /* grab handle, like a sheet */
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 44px;
+  height: 4px;
+  margin-left: -22px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: calc((1 - var(--p)) * 0.25);
+}
+.simple-section .plain > * {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.8s ease,
+    transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.simple-section .plain > .is-in {
+  opacity: 1;
+  transform: none;
+}
+/* the welcome card lifts away, fades and softens as you scroll down */
+.welcome__card {
+  transform: translateY(calc(var(--p) * -90px)) scale(calc(1 - var(--p) * 0.05));
+  opacity: calc(1 - var(--p) * 1.7);
+  filter: blur(calc(var(--p) * 8px));
+  transform-origin: 0 50%;
+}
+.welcome__more,
+.welcome__foot {
+  opacity: calc(1 - var(--p) * 5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage,
+  .simple-section,
+  .welcome__card {
+    transform: none;
+    filter: none;
+  }
+  .simple-section .plain > * {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 .welcome__more {
   position: absolute;

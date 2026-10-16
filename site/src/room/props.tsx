@@ -942,11 +942,11 @@ export function Monitor() {
       <RoundedBox args={[0.26, 0.012, 0.19]} radius={0.005} position={[0, 0.006, 0]} castShadow receiveShadow>
         <meshStandardMaterial color="#c4c8cd" metalness={0.85} roughness={0.3} />
       </RoundedBox>
-      <mesh position={[0, 0.17, -0.05]} rotation={[-0.08, 0, 0]} castShadow>
-        <boxGeometry args={[0.06, 0.33, 0.02]} />
+      <mesh position={[0, 0.135, -0.05]} rotation={[-0.08, 0, 0]} castShadow>
+        <boxGeometry args={[0.06, 0.26, 0.02]} />
         <meshStandardMaterial color="#c4c8cd" metalness={0.85} roughness={0.3} />
       </mesh>
-      <group position={[0, 0.44, -0.035]} rotation={[-0.06, 0, 0]}>
+      <group position={[0, 0.36, -0.035]} rotation={[-0.06, 0, 0]}>
         <RoundedBox args={[w + 0.018, h + 0.02, 0.022]} radius={0.006} castShadow>
           {black}
         </RoundedBox>

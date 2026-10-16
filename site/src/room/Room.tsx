@@ -138,7 +138,7 @@ function lampLabel(p: Props) {
 function BakedRoomScene(p: Props) {
   const [playing, setPlaying] = useState(false)
   const clickables: ClickSpec[] = [
-    { id: 'monitor', label: 'Open my computer', labelY: 0.7, hint: p.laptopMode === 'seat' && p.intro === 'done' && !p.focus, onClick: () => openOn(p, 'monitor') },
+    { id: 'monitor', label: 'Open my computer', labelY: 0.62, hint: p.laptopMode === 'seat' && p.intro === 'done' && !p.focus, onClick: () => openOn(p, 'monitor') },
     { id: 'laptop', label: 'My MacBook', labelY: 0.36, onClick: () => openOn(p, 'laptop') },
     { id: 'cork', label: 'Corkboard — take a closer look', labelY: 0.45, onClick: () => p.onFocus('cork') },
     { id: 'jeepney', label: 'Jeepney', labelY: 0.3, onClick: () => p.onExtra('jeepney') },
@@ -187,10 +187,10 @@ function Scene(p: Props) {
       {/* the desk in front of you */}
       <Desk />
       {/* my actual setup: monitor in the middle, the MacBook on a stand, keyboard, mouse */}
-      <Clickable id="monitor" position={[0.08, 0.75, -2.8]} label="Open my computer" onClick={() => openOn(p, 'monitor')} hint={p.laptopMode === 'seat' && p.intro === 'done' && !p.focus} labelY={0.7}>
+      <Clickable id="monitor" position={[0.08, 0.75, -2.8]} label="Open my computer" onClick={() => openOn(p, 'monitor')} hint={p.laptopMode === 'seat' && p.intro === 'done' && !p.focus} labelY={0.62}>
         <Monitor />
       </Clickable>
-      <Clickable id="laptop" position={[-0.52, 0.75, -2.64]} label="My MacBook" onClick={() => openOn(p, 'laptop')} labelY={0.36}>
+      <Clickable id="laptop" position={[-0.4, 0.75, -2.64]} label="My MacBook" onClick={() => openOn(p, 'laptop')} labelY={0.36}>
         <group rotation={[0, 0.5, 0]}>
           <LaptopOnStand />
         </group>
@@ -203,7 +203,7 @@ function Scene(p: Props) {
       </group>
       <Clickable id="lamp" position={[-0.88, 0.75, -2.84]} label={lampLabel(p)} onClick={p.onLamp} labelY={0.82}>
         {/* turned so the shade hangs over the papers */}
-        <group rotation={[0, -0.85, 0]}>
+        <group rotation={[0, -0.53, 0]}>
           <DeskLamp night={p.night} />
         </group>
       </Clickable>
@@ -218,7 +218,7 @@ function Scene(p: Props) {
         <IcedCoffeeJar />
       </group>
       {/* right in the desk lamp's pool of light */}
-      <Clickable id="papers" position={[-0.8, 0.75, -2.36]} label="My papers" onClick={() => p.onExtra('papers')} labelY={0.12}>
+      <Clickable id="papers" position={[-0.6, 0.75, -2.34]} label="My papers" onClick={() => p.onExtra('papers')} labelY={0.12}>
         <PaperStack />
       </Clickable>
       <MonoblocChair />
