@@ -24,21 +24,129 @@ function hasWebGL() {
   }
 }
 
-/** Eased scroll (slower and softer than the browser's smooth scroll). */
-function glideTo(el: HTMLElement, top: number, ms = 1000) {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return void (el.scrollTop = top)
+/** Eased scroll (slower and more decisive than the browser's smooth scroll). Calls `done` when it lands. */
+let gliding = false
+function glideTo(el: HTMLElement, top: number, done?: () => void, ms = 1050) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    el.scrollTop = top
+    return void done?.()
+  }
   const from = el.scrollTop
   const start = performance.now()
-  el.style.scrollSnapType = 'none' // don't let snapping fight the glide
+  gliding = true
   el.style.scrollBehavior = 'auto'
+  // easeInOutQuart: a firm push off, a long soft landing
+  const ease = (t: number) => (t < 0.5 ? 8 * t ** 4 : 1 - Math.pow(-2 * t + 2, 4) / 2)
   const step = (now: number) => {
     const t = Math.min(1, (now - start) / ms)
-    const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-    el.scrollTop = from + (top - from) * e
-    if (t < 1) requestAnimationFrame(step)
-    else el.style.scrollSnapType = el.style.scrollBehavior = ''
+    el.scrollTop = from + (top - from) * ease(t)
+    if (t < 1) return void requestAnimationFrame(step)
+    el.style.scrollBehavior = ''
+    gliding = false
+    done?.()
   }
   requestAnimationFrame(step)
+}
+
+/**
+ * The landing page has two resting places: the welcome screen and the top of the simple version.
+ * Any scroll between them (wheel, trackpad, swipe, keys) commits to one and glides all the way there,
+ * so the page never sits half-way. Inside the simple version, scrolling is normal.
+ */
+function useLandingSnap(scroller: React.RefObject<HTMLDivElement | null>, active: boolean) {
+  useEffect(() => {
+    const el = scroller.current
+    if (!active || !el) return
+    let quietUntil = 0 // swallow trackpad momentum for a moment after each glide
+    let touchY: number | null = null
+    let atTopSince = 0 // when scrolling up through the simple version last reached its top
+    const simpleTop = () => document.getElementById('simple')?.offsetTop ?? el.clientHeight
+    const go = (dir: 1 | -1) => {
+      glideTo(el, dir > 0 ? simpleTop() : 0, () => (quietUntil = performance.now() + 450))
+    }
+    /** Should input in direction `dir` be taken over by a glide (true), or scroll normally (false)? */
+    const takeOver = (dir: 1 | -1) => {
+      const top = simpleTop()
+      if (el.scrollTop < top - 2) return true // on the welcome screen or in between
+      return dir < 0 && el.scrollTop <= top + 2 // at the very top of the simple version, going up
+    }
+    const busy = () => gliding || performance.now() < quietUntil
+
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) < 2) return
+      const dir = e.deltaY > 0 ? 1 : -1
+      if (busy()) {
+        if (takeOver(dir) || gliding || el.scrollTop <= simpleTop() + 2) e.preventDefault()
+        return
+      }
+      const top = simpleTop()
+      // Flicking up while reading: stop at the top of the simple version instead of flying past it.
+      if (dir < 0 && el.scrollTop > top + 2 && el.scrollTop + e.deltaY < top) {
+        e.preventDefault()
+        el.style.scrollBehavior = 'auto'
+        el.scrollTop = top
+        el.style.scrollBehavior = ''
+        atTopSince = performance.now()
+        return
+      }
+      if (!takeOver(dir)) return
+      e.preventDefault()
+      if (dir < 0 && el.scrollTop <= 0) return
+      // …and only a fresh scroll up from there (not the same flick's momentum) goes back to the welcome screen
+      if (dir < 0 && performance.now() - atTopSince < 400) {
+        atTopSince = performance.now()
+        return
+      }
+      go(dir)
+    }
+    const onTouchStart = (e: TouchEvent) => (touchY = e.touches[0].clientY)
+    const onTouchMove = (e: TouchEvent) => {
+      if (touchY === null) return
+      const dy = touchY - e.touches[0].clientY // > 0: swiping up = scrolling down
+      const dir = dy > 0 ? 1 : -1
+      if (busy() || !takeOver(dir)) {
+        if (gliding) e.preventDefault()
+        return
+      }
+      e.preventDefault()
+      if (Math.abs(dy) > 24 && !(dir < 0 && el.scrollTop <= 0)) {
+        touchY = null
+        go(dir)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      const down = ['ArrowDown', 'PageDown', ' '].includes(e.key)
+      const up = ['ArrowUp', 'PageUp'].includes(e.key)
+      if ((!down && !up) || (e.target as HTMLElement)?.closest?.('input, textarea, button, a')) return
+      const dir = down ? 1 : -1
+      if (busy() || !takeOver(dir)) return
+      e.preventDefault()
+      if (!(dir < 0 && el.scrollTop <= 0)) go(dir)
+    }
+    // Safety net (e.g. dragging the scrollbar): if it comes to rest in between, finish the move.
+    let settle = 0
+    const onScroll = () => {
+      clearTimeout(settle)
+      settle = window.setTimeout(() => {
+        const top = simpleTop()
+        if (gliding || el.scrollTop <= 1 || el.scrollTop >= top - 1) return
+        glideTo(el, el.scrollTop > top * 0.35 ? top : 0, () => (quietUntil = performance.now() + 450), 700)
+      }, 160)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('keydown', onKey)
+    return () => {
+      clearTimeout(settle)
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('scroll', onScroll)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [scroller, active])
 }
 
 export default function App() {
@@ -66,6 +174,7 @@ export default function App() {
   const [simpleInView, setSimpleInView] = useState(false)
   const [wantSimple, setWantSimple] = useState(() => location.hash === '#simple')
   const appRef = useRef<HTMLDivElement>(null)
+  useLandingSnap(scroller, view === 'landing')
   const scrollToSimple = () => {
     const el = scroller.current
     const target = document.getElementById('simple')
@@ -237,8 +346,8 @@ export default function App() {
           <Plain
             webgl
             onEnterRoom={() => {
-              if (scroller.current) glideTo(scroller.current, 0)
-              setTimeout(() => setView('arriving'), 900)
+              if (scroller.current) glideTo(scroller.current, 0, () => setView('arriving'))
+              else setView('arriving')
             }}
           />
         </section>

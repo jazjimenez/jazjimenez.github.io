@@ -140,7 +140,8 @@ code,
   position: absolute;
   inset: 0;
   /* the room eases back as the simple version rises over it */
-  transform: scale(calc(1 - var(--p) * 0.06));
+  /* the room falls back and away as the simple version rises over it */
+  transform: translateY(calc(var(--p) * -8vh)) scale(calc(1 - var(--p) * 0.18));
   transform-origin: 50% 40%;
 }
 .loading {
@@ -257,26 +258,21 @@ code,
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
-  scroll-snap-type: y proximity;
 }
 .landing-dim {
   position: absolute;
   inset: 0;
   background: radial-gradient(120% 90% at 50% 100%, var(--bg) 0%, #120e16 70%);
-  opacity: calc(var(--p) * 0.92);
+  opacity: calc(var(--p) * 0.95);
   pointer-events: none;
-}
-.welcome,
-.simple-section {
-  scroll-snap-align: start;
 }
 /* a sheet that rises over the room: inset with rounded corners, flattening as it reaches the top */
 .simple-section {
   position: relative;
   min-height: 100vh;
-  border-radius: calc((1 - var(--p)) * 28px) calc((1 - var(--p)) * 28px) 0 0;
+  border-radius: calc((1 - var(--p)) * 40px) calc((1 - var(--p)) * 40px) 0 0;
   box-shadow: 0 -24px 70px rgba(0, 0, 0, calc(0.45 - var(--p) * 0.3));
-  transform: scale(calc(0.94 + var(--p) * 0.06));
+  transform: scale(calc(0.86 + var(--p) * 0.14));
   transform-origin: 50% 0;
 }
 .simple-section::before {
@@ -294,10 +290,10 @@ code,
 }
 .simple-section .sv > * {
   opacity: 0;
-  transform: translateY(28px);
+  transform: translateY(56px);
   transition:
-    opacity 0.8s ease,
-    transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+    opacity 0.9s ease,
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .simple-section .sv > .is-in {
   opacity: 1;
@@ -305,9 +301,9 @@ code,
 }
 /* the welcome card lifts away, fades and softens as you scroll down */
 .welcome__card {
-  transform: translateY(calc(var(--p) * -90px)) scale(calc(1 - var(--p) * 0.05));
-  opacity: calc(1 - var(--p) * 1.7);
-  filter: blur(calc(var(--p) * 8px));
+  transform: translateY(calc(var(--p) * -28vh)) scale(calc(1 - var(--p) * 0.16));
+  opacity: calc(1 - var(--p) * 2);
+  filter: blur(calc(var(--p) * 14px));
   transform-origin: 0 50%;
 }
 .welcome__more,
