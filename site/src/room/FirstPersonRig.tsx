@@ -1,6 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { landingMotion } from './landingMotion'
 import { SEAT_EYE } from './layout'
 import { currentScreen, focusTargets, type FocusId, updatePortal } from './screenPortal'
 
@@ -189,6 +190,11 @@ export default function FirstPersonRig({
 
   useEffect(() => invalidate(), [focus, invalidate])
 
+  useEffect(() => {
+    landingMotion.wake = invalidate
+    return () => void (landingMotion.wake = null)
+  }, [invalidate])
+
   // Dev-only handle for inspecting views from the console: __room.look(yaw, pitch)
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -294,6 +300,8 @@ export default function FirstPersonRig({
 
     // ---- welcome page: slow drift around the dollhouse view ----
     if (intro === 'landing') {
+      // scrolling to the simple version: hold still and stop drawing (no React re-render needed)
+      if (landingMotion.paused) return
       // own clock (dt is clamped), so pausing the room while you scroll doesn't make the drift jump
       const t = (landingTime.current += dt)
       const drift = Math.sin(t * 0.18) * 0.35
