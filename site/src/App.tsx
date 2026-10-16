@@ -82,7 +82,14 @@ export default function App() {
   useEffect(() => {
     if (view !== 'landing' || !wantSimple) return
     const id = requestAnimationFrame(() => {
-      document.getElementById('simple')?.scrollIntoView()
+      const el = scroller.current
+      const target = document.getElementById('simple')
+      if (el && target) {
+        // jump straight there (no smooth scrolling or snapping on the way)
+        el.style.scrollBehavior = el.style.scrollSnapType = 'auto'
+        el.scrollTop = target.offsetTop
+        requestAnimationFrame(() => (el.style.scrollBehavior = el.style.scrollSnapType = ''))
+      }
       setWantSimple(false)
     })
     return () => cancelAnimationFrame(id)
@@ -105,7 +112,7 @@ export default function App() {
   useEffect(() => {
     const root = scroller.current
     if (view !== 'landing' || !root) return
-    const items = root.querySelectorAll('.simple-section .plain > *')
+    const items = root.querySelectorAll('.simple-section .sv > *')
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries)
