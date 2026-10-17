@@ -10,7 +10,11 @@ export const LOOK_YAWS = [1.3, 0, -1.3] as const
 /** Head tilt per view: level at the window, down at the desk, a little down for records/books. */
 const LOOK_PITCHES = [0.02, -0.16, 0.02] as const
 export const CENTER_VIEW = 1
-const TURN_SECONDS = 0.95
+// Head movement uses critically damped springs (no fixed-length tweens): motion keeps its velocity
+// when you change your mind mid-turn, starts and stops softly, and never overshoots.
+const TURN_TIME = 0.3 // spring "smooth time" for turning between views (≈1 s to settle)
+const GLANCE_TIME = 0.22 // …for the small glance that follows the cursor
+const MOVE_TIME = 0.4 // …for moving the head back to the chair (after zooming in on something)
 const EDGE = 0.86 // cursor this close to a side edge…
 const EDGE_DWELL = 0.35 // …for this long (s) turns you that way
 const SWIPE_PX = 50
@@ -28,6 +32,16 @@ const LANDING_OFFSET = new THREE.Vector3(6.2, 4.4, 6.6)
 const ARRIVE_VIA = new THREE.Vector3(1.6, 2.2, 1.4)
 // On wide screens the welcome text sits on the left, so shift the room toward the right of the frame.
 const LANDING_SHIFT = 0.17 // fraction of the view width
+
+/** Critically damped spring step (Game Programming Gems 4, "smooth damp"). Returns [value, velocity]. */
+function damp(x: number, target: number, v: number, smoothTime: number, dt: number): [number, number] {
+  const omega = 2 / smoothTime
+  const k = omega * dt
+  const decay = 1 / (1 + k + 0.48 * k * k + 0.235 * k * k * k)
+  const change = x - target
+  const temp = (v + omega * change) * dt
+  return [target + (change + temp) * decay, (v - omega * temp) * decay]
+}
 
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
@@ -62,9 +76,10 @@ export default function FirstPersonRig({
 }) {
   const { camera, gl, size, invalidate, get } = useThree()
   const yaw = useRef<number>(LOOK_YAWS[look])
-  const turn = useRef({ from: LOOK_YAWS[look] as number, to: LOOK_YAWS[look] as number, t: 1 })
   const basePitch = useRef<number>(LOOK_PITCHES[look])
-  const pitchTurn = useRef({ from: LOOK_PITCHES[look] as number, to: LOOK_PITCHES[look] as number })
+  // spring state: velocities, the glance offsets, a smoothed frame time, and which mode ran last frame
+  const m = useRef({ yawV: 0, pitchV: 0, gx: 0, gxV: 0, gy: 0, gyV: 0, dt: 1 / 60, idle: true, branch: '', devYaw: null as number | null })
+  const posV = useMemo(() => new THREE.Vector3(), [])
   const pointer = useRef({ x: 0, y: 0, overCanvas: false, edgeSince: 0, edgeFired: false })
   const swipe = useRef<{ x: number; done: boolean } | null>(null)
   const landingTime = useRef(0)
@@ -111,16 +126,14 @@ export default function FirstPersonRig({
       arrive.current.t = 0
       arrive.current.done = false
       yaw.current = LOOK_YAWS[look]
-      turn.current = { from: yaw.current, to: yaw.current, t: 1 }
       basePitch.current = LOOK_PITCHES[look]
     }
     invalidate()
   }, [intro]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Start an eased turn whenever the requested view changes.
+  // The springs head for the new view on the next frame.
   useEffect(() => {
-    turn.current = { from: yaw.current, to: LOOK_YAWS[look], t: 0 }
-    pitchTurn.current = { from: basePitch.current, to: LOOK_PITCHES[look] }
+    m.current.devYaw = null
     invalidate()
   }, [look, invalidate])
 
@@ -201,11 +214,12 @@ export default function FirstPersonRig({
     ;(window as unknown as { __room: unknown }).__room = {
       look: (y: number, p = 0) => {
         yaw.current = y
-        turn.current = { from: y, to: y, t: 1 }
+        m.current.devYaw = y
         pitchOffset.current = p
         invalidate()
       },
       frames: () => gl.info.render.frame,
+      rig: () => ({ ...m.current, yaw: yaw.current, pitch: basePitch.current, pos: camera.position.toArray() }),
       store: get,
       exportScene: async () => (await import('./devExport')).exportRoomScene(get().scene),
     }
@@ -272,12 +286,22 @@ export default function FirstPersonRig({
     else if (cam.view?.enabled) cam.clearViewOffset()
   }
 
-  useFrame((state, dt) => {
-    dt = Math.min(dt, 0.1)
+  useFrame((state, rawDt) => {
+    // Frame pacing: the first frame after the room sat idle carries the whole idle gap in its dt,
+    // which would make every movement start with a jump. Treat it as one normal frame, and smooth
+    // the frame time after that so small timing jitter doesn't show up as uneven motion.
+    const ms = m.current
+    if (ms.idle) {
+      ms.idle = false
+      ms.dt = 1 / 60
+    } else ms.dt += (Math.min(rawDt, 1 / 20) - ms.dt) * 0.3
+    const dt = ms.dt
     const p = pointer.current
+    const settled = () => (ms.idle = true) // nothing left to animate: next frame starts fresh
 
     // ---- leaning in / out: one continuous, eased move ----
     if (mode === 'entering' || mode === 'leaving') {
+      ms.branch = 'lean'
       const l = lean.current
       if (!screenPose()) return
       l.t = THREE.MathUtils.clamp(l.t + ((mode === 'entering' ? 1 : -1) * dt) / LEAN_SECONDS, 0, 1)
@@ -296,12 +320,16 @@ export default function FirstPersonRig({
       }
       return
     }
-    if (mode === 'inside') return
+    if (mode === 'inside') {
+      ms.branch = 'inside'
+      return void settled()
+    }
 
     // ---- welcome page: slow drift around the dollhouse view ----
     if (intro === 'landing') {
+      ms.branch = 'landing'
       // scrolling to the simple version: hold still and stop drawing (no React re-render needed)
-      if (landingMotion.paused) return
+      if (landingMotion.paused) return void settled()
       // own clock (dt is clamped), so pausing the room while you scroll doesn't make the drift jump
       const t = (landingTime.current += dt)
       const drift = Math.sin(t * 0.18) * 0.35
@@ -316,6 +344,7 @@ export default function FirstPersonRig({
 
     // ---- "Enter the room": one curved, eased flight into the chair ----
     if (intro === 'arriving') {
+      ms.branch = 'arriving'
       const a = arrive.current
       a.t = Math.min(1, a.t + dt / ARRIVE_SECONDS)
       const e = easeInOutCubic(a.t)
@@ -339,15 +368,31 @@ export default function FirstPersonRig({
 
     // ---- zoomed in on something (the corkboard): ease over, hold still ----
     if (focus && focusPose(focus)) {
+      if (ms.branch !== 'focus') posV.set(0, 0, 0)
+      ms.branch = 'focus'
       p.edgeSince = 0
-      camera.position.lerp(tmp.endPos, 1 - Math.exp(-dt * 3.2))
-      camera.quaternion.slerp(tmp.endQ, 1 - Math.exp(-dt * 4.5))
-      const posDone = camera.position.distanceToSquared(tmp.endPos) < 1e-6
-      const rotDone = camera.quaternion.angleTo(tmp.endQ) < 2e-3
-      if (posDone) camera.position.copy(tmp.endPos)
-      if (rotDone) camera.quaternion.copy(tmp.endQ)
-      if (!posDone || !rotDone) state.invalidate()
+      for (const ax of ['x', 'y', 'z'] as const) [camera.position[ax], posV[ax]] = damp(camera.position[ax], tmp.endPos[ax], posV[ax], 0.45, dt)
+      camera.quaternion.slerp(tmp.endQ, 1 - Math.exp(-dt * 5))
+      const posDone = camera.position.distanceToSquared(tmp.endPos) < 1e-7 && posV.lengthSq() < 1e-6
+      const rotDone = camera.quaternion.angleTo(tmp.endQ) < 1e-3
+      if (posDone && rotDone) {
+        camera.position.copy(tmp.endPos)
+        camera.quaternion.copy(tmp.endQ)
+        return void settled()
+      }
+      state.invalidate()
       return
+    }
+
+    // Coming back to the chair from anything else (zoom, screen, flight in): pick the springs up
+    // from wherever the camera is pointing now, so the hand-over is seamless.
+    if (ms.branch !== 'seat') {
+      tmp.normal.set(0, 0, -1).applyQuaternion(camera.quaternion)
+      yaw.current = Math.atan2(-tmp.normal.x, -tmp.normal.z)
+      basePitch.current = Math.asin(THREE.MathUtils.clamp(tmp.normal.y, -1, 1)) + pitchOffset.current
+      ms.yawV = ms.pitchV = ms.gx = ms.gxV = ms.gy = ms.gyV = 0
+      posV.set(0, 0, 0)
+      ms.branch = 'seat'
     }
 
     // Resting the cursor at a side edge asks to turn that way (once per visit to the edge).
@@ -357,36 +402,40 @@ export default function FirstPersonRig({
       request.current(p.x < 0 ? -1 : 1)
     }
 
-    // Eased turn between views.
-    const tw = turn.current
-    if (tw.t < 1) {
-      tw.t = Math.min(1, tw.t + dt / TURN_SECONDS)
-      const e = easeInOutCubic(tw.t)
-      yaw.current = THREE.MathUtils.lerp(tw.from, tw.to, e)
-      basePitch.current = THREE.MathUtils.lerp(pitchTurn.current.from, pitchTurn.current.to, e)
-    }
-
-    // Small "glance" toward the cursor while it's in the middle of the screen.
-    const glanceX = p.overCanvas ? THREE.MathUtils.clamp(p.x, -EDGE, EDGE) * 0.12 : 0
-    const glanceY = p.overCanvas ? p.y * 0.16 : 0
-    const y = yaw.current - glanceX
-    const pitch = THREE.MathUtils.clamp(basePitch.current - glanceY - pitchOffset.current, -1.1, 0.9)
+    // Turning between views, plus a small "glance" toward the cursor — all on springs.
+    const yawT = ms.devYaw ?? LOOK_YAWS[look]
+    const pitchT = LOOK_PITCHES[look]
+    const gxT = p.overCanvas ? THREE.MathUtils.clamp(p.x, -EDGE, EDGE) * 0.12 : 0
+    const gyT = p.overCanvas ? p.y * 0.16 : 0
+    ;[yaw.current, ms.yawV] = damp(yaw.current, yawT, ms.yawV, TURN_TIME, dt)
+    ;[basePitch.current, ms.pitchV] = damp(basePitch.current, pitchT, ms.pitchV, TURN_TIME, dt)
+    ;[ms.gx, ms.gxV] = damp(ms.gx, gxT, ms.gxV, GLANCE_TIME, dt)
+    ;[ms.gy, ms.gyV] = damp(ms.gy, gyT, ms.gyV, GLANCE_TIME, dt)
     const eye = SEAT_EYE
-    const look = tmp.look.set(eye.x - Math.sin(y) * Math.cos(pitch), eye.y + Math.sin(pitch), eye.z - Math.cos(y) * Math.cos(pitch))
+    for (const ax of ['x', 'y', 'z'] as const) [camera.position[ax], posV[ax]] = damp(camera.position[ax], eye[ax], posV[ax], MOVE_TIME, dt)
 
-    const k = 1 - Math.exp(-dt * 7)
-    camera.position.lerp(eye, 1 - Math.exp(-dt * 3))
-    tmp.m.lookAt(camera.position, look, camera.up)
-    tmp.q.setFromRotationMatrix(tmp.m)
-    camera.quaternion.slerp(tmp.q, k)
+    const y = yaw.current - ms.gx
+    const pitch = THREE.MathUtils.clamp(basePitch.current - ms.gy - pitchOffset.current, -1.1, 0.9)
+    tmp.look.set(-Math.sin(y) * Math.cos(pitch), Math.sin(pitch), -Math.cos(y) * Math.cos(pitch)).add(camera.position)
+    camera.lookAt(tmp.look)
 
-    // On-demand rendering: keep asking for frames only while the view is still settling.
-    // Snap the last hair of the way so float rounding can't keep it "settling" forever.
-    const posDone = camera.position.distanceToSquared(eye) < 1e-6
-    const rotDone = camera.quaternion.angleTo(tmp.q) < 2e-3
-    if (posDone) camera.position.copy(eye)
-    if (rotDone) camera.quaternion.copy(tmp.q)
-    if (tw.t < 1 || resting || !posDone || !rotDone) state.invalidate()
+    // On-demand rendering: keep drawing only while something is still moving, then snap the last
+    // hair of the way so float rounding can't keep it "settling" forever.
+    const still =
+      Math.abs(yaw.current - yawT) + Math.abs(basePitch.current - pitchT) + Math.abs(ms.gx - gxT) + Math.abs(ms.gy - gyT) < 2e-4 &&
+      Math.abs(ms.yawV) + Math.abs(ms.pitchV) + Math.abs(ms.gxV) + Math.abs(ms.gyV) < 2e-3 &&
+      camera.position.distanceToSquared(eye) < 1e-8
+    if (still) {
+      yaw.current = yawT
+      basePitch.current = pitchT
+      ms.gx = gxT
+      ms.gy = gyT
+      ms.yawV = ms.pitchV = ms.gxV = ms.gyV = 0
+      camera.position.copy(eye)
+      posV.set(0, 0, 0)
+    }
+    if (!still || resting) state.invalidate()
+    else settled()
   })
 
   return null

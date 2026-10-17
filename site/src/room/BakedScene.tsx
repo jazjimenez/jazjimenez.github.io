@@ -32,8 +32,6 @@ const HOT: Record<string, THREE.Color> = {
 }
 const SKY_DAY = new THREE.Color(1.7, 1.7, 1.7)
 const SKY_NIGHT = new THREE.Color(1, 1, 1)
-// Posters and the corkboard aren't baked (their pictures load live), so they're dimmed per mode instead.
-const UNBAKED_TINT = { day: 0.95, night: 0.55, cozy: 0.3 }
 
 export type ClickSpec = { id: string; label: string; labelY: number; hint?: boolean; onClick: () => void }
 
@@ -77,7 +75,6 @@ export default function BakedScene({ night, cozy, rainy, playing, clickables, cu
     const baked: (THREE.MeshBasicMaterial | THREE.MeshStandardMaterial)[] = []
     const emitters: { key: string; mesh: THREE.Mesh; normal: THREE.Material; hot: THREE.Material }[] = []
     const screenMats: THREE.MeshBasicMaterial[] = []
-    const unbaked: THREE.MeshBasicMaterial[] = []
     let outside: THREE.Mesh | null = null
     const nodes: Record<string, THREE.Object3D> = {}
     // Long, thin trim (baseboards/crown) along the front and right walls: hidden in the cutaway view,
@@ -110,19 +107,16 @@ export default function BakedScene({ night, cozy, rainy, playing, clickables, cu
         screens[id] = mesh
         return
       }
-      const poster = /^nobake_poster_(\d+)/.exec(mesh.name)
-      if (poster || mesh.name === 'nobake_cork') {
-        const m = new THREE.MeshBasicMaterial({ map: poster ? livePoster(Number(poster[1])) : liveCorkboard() })
-        unbaked.push(m)
-        mesh.material = m
-        if (!poster) focusTargets.cork.mesh = mesh
-        return
-      }
+      // Posters and the corkboard face are baked like everything else (they get the room's light and
+      // shadows); only their picture is live, drawn/loaded in the browser instead of stored in the GLB.
+      const poster = /^live_poster_(\d+)/.exec(mesh.name)
+      const liveMap = poster ? livePoster(Number(poster[1])) : mesh.name === 'live_cork' ? liveCorkboard() : null
+      if (mesh.name === 'live_cork') focusTargets.cork.mesh = mesh
       // The office chair's woven mesh is a cut-out texture: see-through gaps, solid threads.
       const cutout = src.alphaTest > 0 || src.name.startsWith('hd_mesh')
       const common = {
-        map: src.map,
-        color: src.color,
+        map: liveMap ?? src.map,
+        color: liveMap ? new THREE.Color(1, 1, 1) : src.color,
         // Draw everything opaque (cut-outs use alpha testing instead). Overlapping translucent layers
         // — the two capiz sashes — can't be depth-sorted reliably and flicker as the camera moves.
         transparent: false,
@@ -158,7 +152,8 @@ export default function BakedScene({ night, cozy, rainy, playing, clickables, cu
       const hotKey = Object.keys(HOT).find((k) => tagged(mesh, k))
       if (hotKey) emitters.push({ key: hotKey, mesh, normal: m, hot: new THREE.MeshBasicMaterial({ color: HOT[hotKey], toneMapped: false }) })
     })
-    return { baked, emitters, outside: outside as THREE.Mesh | null, nodes, cutawayTrim, screenMats, unbaked }
+    focusTargets.certs.mesh = nodes.clk_credentials ?? null
+    return { baked, emitters, outside: outside as THREE.Mesh | null, nodes, cutawayTrim, screenMats }
   }, [gltf, dayMap, nightMap, cozyMap])
 
   // Day / night / rain: swap the lightmap, light up the emitters, change the view outside.
@@ -179,11 +174,48 @@ export default function BakedScene({ night, cozy, rainy, playing, clickables, cu
     if (scene.nodes.cup_night) scene.nodes.cup_night.visible = night
     // the screens are light sources too — a touch brighter in the dark
     for (const m of scene.screenMats) m.color.setScalar(mode === 'cozy' ? 1.35 : 1)
-    for (const m of scene.unbaked) m.color.setScalar(UNBAKED_TINT[mode] * (mode === 'day' && rainy ? 0.8 : 1))
     if (scene.outside) scene.outside.material = new THREE.MeshBasicMaterial({ map: outsideTex, color: night ? SKY_NIGHT : SKY_DAY, toneMapped: false })
     invalidate()
   }, [night, cozy, rainy, scene, dayMap, nightMap, cozyMap, outsideTex, invalidate])
 
+
+  // Pre-warm the GPU: upload every texture (all three lightmaps included) and compile every shader
+  // up front. Otherwise each is uploaded the first time it comes into view, and the first turn
+  // toward a new part of the room, or the first day/night switch, stutters.
+  const gl = useThree((s) => s.gl)
+  const camera = useThree((s) => s.camera)
+  useEffect(() => {
+    const seen = new Set<THREE.Texture>()
+    const add = (t: THREE.Texture | null | undefined) => {
+      if (t && !seen.has(t)) {
+        seen.add(t)
+        gl.initTexture(t)
+      }
+    }
+    for (const t of [dayMap, nightMap, cozyMap]) add(t)
+    gltf.scene.traverse((o) => {
+      const mats = (o as THREE.Mesh).material
+      for (const mat of Array.isArray(mats) ? mats : mats ? [mats] : []) {
+        const mm = mat as THREE.MeshStandardMaterial
+        add(mm.map)
+        add(mm.lightMap)
+      }
+    })
+    // compile with everything visible (the hidden cup too) so no shader is left to build later
+    const hidden: THREE.Object3D[] = []
+    gltf.scene.traverse((o) => {
+      if (!o.visible) {
+        hidden.push(o)
+        o.visible = true
+      }
+    })
+    gl.compileAsync(gltf.scene, camera)
+      .catch(() => {})
+      .finally(() => {
+        hidden.forEach((o) => (o.visible = false))
+        invalidate()
+      })
+  }, [gl, camera, gltf, dayMap, nightMap, cozyMap, invalidate])
 
   // posters / corkboard photos arrive after load: redraw once they do
   useEffect(() => onLiveTextureChange(invalidate), [invalidate])

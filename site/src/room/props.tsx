@@ -15,7 +15,8 @@ import {
 } from './textures'
 import { focusTargets, SCREEN_H, SCREEN_SIZE, SCREEN_W, screens } from './screenPortal'
 import { CORK, liveCorkboard, livePoster } from './liveTextures'
-import { letterboxd, papers } from '../data/content'
+import { education, letterboxd, papers } from '../data/content'
+import { pub, pubList } from '../data/publish'
 
 export const WOOD = '#8a4b22'
 export const WOOD_DARK = '#5e3216'
@@ -525,22 +526,37 @@ export function Parol({ lit }: { lit: boolean }) {
 }
 
 export function Certificates() {
-  const texA = useMemo(() => certificateTexture('IEEE TENCON 2026'), [])
-  const texB = useMemo(() => certificateTexture('De La Salle University'), [])
+  const [texA, texB] = useMemo(() => {
+    const paper = papers[0]
+    const degree = education[0]
+    return [
+      certificateTexture('IEEE TENCON 2026 · Accepted paper', paper.title, [paper.authors, pub(paper.venue)]),
+      certificateTexture(degree.school, pub(degree.degree) || 'Computer Science', ['College of Computer Studies', ...pubList(degree.notes).slice(0, 1)], '#1f6b45'),
+    ]
+  }, [])
   return (
-    <group>
+    <group
+      ref={(g) => {
+        focusTargets.certs.mesh = g
+      }}
+    >
       {[
-        [-0.32, 0, texA],
-        [0.32, 0.08, texB],
-      ].map(([x, y, tex], i) => (
-        <group key={i} position={[x as number, y as number, 0]}>
-          <mesh position={[0, 0, 0.01]} castShadow>
-            <boxGeometry args={[0.5, 0.39, 0.03]} />
-            <meshStandardMaterial color="#3b2416" />
+        [-0.3, texA],
+        [0.3, texB],
+      ].map(([x, tex], i) => (
+        <group key={i} position={[x as number, 0, 0]}>
+          {/* dark wood frame with a cream mat */}
+          <mesh position={[0, 0, 0.012]} castShadow>
+            <boxGeometry args={[0.52, 0.4, 0.024]} />
+            <meshStandardMaterial color="#3b2416" roughness={0.55} />
           </mesh>
-          <mesh position={[0, 0, 0.027]}>
-            <planeGeometry args={[0.44, 0.33]} />
-            <meshStandardMaterial map={tex as THREE.Texture} />
+          <mesh position={[0, 0, 0.0245]}>
+            <planeGeometry args={[0.46, 0.345]} />
+            <meshStandardMaterial color="#efe6d2" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 0, 0.025]}>
+            <planeGeometry args={[0.4, 0.3]} />
+            <meshStandardMaterial map={tex as THREE.Texture} roughness={0.8} />
           </mesh>
         </group>
       ))}
@@ -548,21 +564,22 @@ export function Certificates() {
   )
 }
 
-/** My Letterboxd top 4, as a row of framed posters (official art, loaded live from TMDB). */
+/**
+ * My Letterboxd top 4: unframed paper posters on the wall (official art, loaded live from TMDB).
+ * They're part of the light bake (named live_*), so the lamp, window light and shadows fall on them
+ * like on the wall; only the picture itself is swapped in at runtime.
+ */
 export function Posters() {
   const textures = useMemo(() => letterboxd.favorites.map((_, i) => livePoster(i)), [])
   return (
     <group>
       {textures.map((tex, i) => (
-        <group key={i} position={[(i - 1.5) * 0.44, 0, 0]}>
-          {/* thin black frame */}
-          <mesh position={[0, 0, 0.012]} castShadow>
-            <boxGeometry args={[0.4, 0.58, 0.02]} />
-            <meshStandardMaterial color="#141414" roughness={0.5} />
-          </mesh>
-          <mesh name={`nobake_poster_${i}`} position={[0, 0, 0.0225]}>
-            <planeGeometry args={[0.37, 0.555]} />
-            <meshStandardMaterial map={tex} roughness={0.7} />
+        // a touch of irregularity, like posters hung by hand
+        <group key={i} position={[(i - 1.5) * 0.45, [0.004, -0.006, 0.002, -0.003][i], 0]} rotation={[0, 0, [0.006, -0.004, 0.003, -0.007][i]]}>
+          <mesh name={`live_poster_${i}`} position={[0, 0, 0.0025]} castShadow receiveShadow>
+            {/* paper-thin: just enough of an edge to catch light */}
+            <boxGeometry args={[0.4, 0.6, 0.003]} />
+            <meshStandardMaterial map={tex} roughness={0.85} />
           </mesh>
         </group>
       ))}
@@ -1024,7 +1041,7 @@ export function Corkboard() {
         <meshStandardMaterial color="#9c7046" roughness={1} />
       </mesh>
       <mesh
-        name="nobake_cork"
+        name="live_cork"
         position={[0, 0, 0.0145]}
         ref={(m) => {
           focusTargets.cork.mesh = m

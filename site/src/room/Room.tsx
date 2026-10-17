@@ -142,7 +142,7 @@ function BakedRoomScene(p: Props) {
     { id: 'laptop', label: 'My MacBook', labelY: 0.36, onClick: () => openOn(p, 'laptop') },
     { id: 'cork', label: 'Corkboard — take a closer look', labelY: 0.45, onClick: () => p.onFocus('cork') },
     { id: 'jeepney', label: 'Jeepney', labelY: 0.3, onClick: () => p.onExtra('jeepney') },
-    { id: 'credentials', label: 'Credentials', labelY: 0.4, onClick: p.onOpenCredentials },
+    { id: 'credentials', label: 'Certificates — take a closer look', labelY: 0.32, onClick: () => p.onFocus('certs') },
     { id: 'parol', label: p.night ? 'Parol — turn the day back on' : 'Parol — make it night', labelY: -0.75, onClick: p.onToggleNight },
     { id: 'baybayin', label: 'Baybayin scroll', labelY: 0.7, onClick: () => p.onExtra('baybayin') },
     { id: 'lamp', label: lampLabel(p), labelY: 0.82, onClick: p.onLamp },
@@ -225,7 +225,8 @@ function Scene(p: Props) {
       <Clickable id="jeepney" position={[0.72, 0.75, -2.86]} label="Jeepney" onClick={() => p.onExtra('jeepney')} labelY={0.3}>
         <Jeepney />
       </Clickable>
-      <Clickable id="credentials" position={[-0.3, 2.2, -2.98]} label="Credentials" onClick={p.onOpenCredentials} labelY={0.4}>
+      {/* eye level above the record cabinet, so they're readable from the chair (click to zoom in) */}
+      <Clickable id="credentials" position={[2.0, 1.22, -2.98]} label="Certificates — take a closer look" onClick={() => p.onFocus('certs')} labelY={0.32}>
         <Certificates />
       </Clickable>
 
