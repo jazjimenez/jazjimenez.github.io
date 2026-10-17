@@ -417,7 +417,13 @@ export default function App() {
                 ← Back
               </button>
               <div className="hud hud--bottom">
-                <span className="hint">My corkboard · Esc to step back</span>
+                {focus === 'certs' ? (
+                  <button className="btn btn--primary" onClick={() => goToLaptop('credentials')}>
+                    See all my credentials →
+                  </button>
+                ) : (
+                  <span className="hint">My corkboard · Esc to step back</span>
+                )}
               </div>
             </>
           ) : (

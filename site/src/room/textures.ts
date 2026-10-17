@@ -194,24 +194,73 @@ export function baybayinTexture() {
   })
 }
 
-/** Certificate on the wall. */
-export function certificateTexture(line: string) {
-  return canvasTexture(320, 240, (g) => {
-    g.fillStyle = '#fbf7ee'
-    g.fillRect(0, 0, 320, 240)
-    g.strokeStyle = '#c9a050'
-    g.lineWidth = 6
-    g.strokeRect(14, 14, 292, 212)
+/** Framed certificate on the wall: sharp enough to read when you zoom in on it. */
+export function certificateTexture(kicker: string, title: string, lines: string[], seal = '#b03a2e') {
+  const W = 1024
+  const H = 768
+  const wrap = (g: CanvasRenderingContext2D, text: string, maxW: number) => {
+    const out: string[] = []
+    let cur = ''
+    for (const w of text.split(' ')) {
+      const t = cur ? `${cur} ${w}` : w
+      if (g.measureText(t).width > maxW && cur) {
+        out.push(cur)
+        cur = w
+      } else cur = t
+    }
+    if (cur) out.push(cur)
+    return out
+  }
+  return canvasTexture(W, H, (g) => {
+    const paper = g.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, W * 0.7)
+    paper.addColorStop(0, '#fdfaf2')
+    paper.addColorStop(1, '#f1e8d4')
+    g.fillStyle = paper
+    g.fillRect(0, 0, W, H)
+    // double gilt border
+    g.strokeStyle = '#b8954a'
+    g.lineWidth = 10
+    g.strokeRect(34, 34, W - 68, H - 68)
+    g.lineWidth = 2
+    g.strokeRect(54, 54, W - 108, H - 108)
     g.fillStyle = '#3a2a1a'
     g.textAlign = 'center'
-    g.font = '700 22px Georgia, serif'
-    g.fillText('Certificate', 160, 80)
-    g.font = '14px Georgia, serif'
-    g.fillText(line, 160, 120)
-    g.fillStyle = '#c0392b'
+    g.font = '600 26px Georgia, serif'
+    g.fillText(kicker.toUpperCase().split('').join(' '), W / 2, 140)
+    g.font = '700 50px Georgia, serif'
+    let y = 230
+    for (const l of wrap(g, title, W - 220)) {
+      g.fillText(l, W / 2, y)
+      y += 60
+    }
+    g.fillStyle = '#5a4630'
+    g.font = 'italic 32px Georgia, serif'
+    y += 16
+    for (const line of lines) {
+      for (const l of wrap(g, line, W - 300)) {
+        g.fillText(l, W / 2, y)
+        y += 42
+      }
+    }
+    // seal with ribbon
+    g.fillStyle = seal
     g.beginPath()
-    g.arc(160, 180, 18, 0, Math.PI * 2)
+    g.moveTo(W / 2 - 34, H - 150)
+    g.lineTo(W / 2 - 52, H - 70)
+    g.lineTo(W / 2 - 18, H - 92)
+    g.lineTo(W / 2 + 18, H - 92)
+    g.lineTo(W / 2 + 52, H - 70)
+    g.lineTo(W / 2 + 34, H - 150)
     g.fill()
+    g.fillStyle = '#c9a548'
+    g.beginPath()
+    g.arc(W / 2, H - 160, 46, 0, Math.PI * 2)
+    g.fill()
+    g.strokeStyle = '#a3822f'
+    g.lineWidth = 4
+    g.beginPath()
+    g.arc(W / 2, H - 160, 36, 0, Math.PI * 2)
+    g.stroke()
   })
 }
 

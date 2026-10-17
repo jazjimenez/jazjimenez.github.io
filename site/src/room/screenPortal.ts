@@ -27,9 +27,11 @@ export const screens: Record<ScreenId, THREE.Mesh | null> = { monitor: null, lap
 export const activeScreen: { id: ScreenId } = { id: 'monitor' }
 
 /** Things the camera can zoom in on from the chair (e.g. the corkboard). Registered by the scene. */
-export type FocusId = 'cork'
-export const focusTargets: Record<FocusId, { mesh: THREE.Mesh | null; w: number; h: number }> = {
+export type FocusId = 'cork' | 'certs'
+/** `mesh`: any object centred on the target with its +z facing out of the wall. */
+export const focusTargets: Record<FocusId, { mesh: THREE.Object3D | null; w: number; h: number }> = {
   cork: { mesh: null, w: 1.0, h: 0.7 },
+  certs: { mesh: null, w: 1.16, h: 0.48 },
 }
 
 export function currentScreen() {

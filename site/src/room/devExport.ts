@@ -10,7 +10,7 @@ export async function exportRoomScene(scene: THREE.Scene) {
   if (scene.getObjectByName('nobake_outside')?.visible === false) return 'Enter the room first (the welcome view hides some walls).'
   const hidden: THREE.Object3D[] = []
   const scaled: [THREE.Object3D, THREE.Vector3][] = []
-  // screens, posters and the corkboard get their pictures at runtime: don't ship them in the GLB
+  // screens, posters and the corkboard face get their pictures at runtime: don't ship them in the GLB
   const swapped: [THREE.Mesh, THREE.Material | THREE.Material[]][] = []
   const plain = new THREE.MeshStandardMaterial({ color: '#808080', roughness: 0.6 })
   scene.traverse((o) => {
@@ -28,7 +28,7 @@ export async function exportRoomScene(scene: THREE.Scene) {
         }
       })
     }
-    if ((o as THREE.Mesh).isMesh && /^nobake_(screen_|poster_|cork)/.test(o.name)) {
+    if ((o as THREE.Mesh).isMesh && /^(nobake_screen_|live_)/.test(o.name)) {
       const m = o as THREE.Mesh
       swapped.push([m, m.material])
       m.material = plain
