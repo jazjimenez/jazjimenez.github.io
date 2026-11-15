@@ -164,13 +164,44 @@ function applyLandingProgress(app: HTMLElement, p: number) {
   const vh = app.clientHeight / 100
   // the room stays put and simply dims behind the rising sheet
   set(q('.landing-dim'), null, 0.95 * p)
-  // the welcome text shoots up, shrinks and fades
+  // the title card shoots up, shrinks and fades; the letterbox bars pull away
   set(q('.welcome__card'), `translate3d(0, ${(-28 * vh * p).toFixed(1)}px, 0) scale(${(1 - 0.16 * p).toFixed(4)})`, 1 - 2 * p)
-  set(q('.welcome__more'), null, 1 - 5 * p)
-  set(q('.welcome__foot'), null, 1 - 5 * p)
+  set(q('.cine-bar--top'), `translate3d(0, ${(-100 * Math.min(1, 2 * p)).toFixed(1)}%, 0)`, null)
+  set(q('.cine-bar--bottom'), null, 1 - 4 * p)
+  set(q('.frame-corners'), null, 1 - 3 * p)
   // the simple version rises as a card and grows to full width
   set(q('.simple-section'), `scale(${(0.86 + 0.14 * p).toFixed(4)})`, null)
   set(q('.simple-section__handle'), null, (1 - p) * 0.25)
+}
+
+/** The three places you can look from the chair, named like a shot list. */
+const SHOTS = ['Window', 'Desk', 'Shelf'] as const
+
+/** Live Manila time, HH:MM:SS. Updates its own text node, so it never re-renders the app. */
+function Timecode() {
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+    const tick = () => {
+      if (ref.current) ref.current.textContent = fmt.format(new Date())
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return <span ref={ref} className="tc" />
+}
+
+/** Blinking "● REC" with the scene heading, like a camera's on-screen display. */
+function Slug({ night }: { night: boolean }) {
+  return (
+    <span className="slug">
+      <span className="rec">
+        <i aria-hidden /> REC
+      </span>
+      <span>INT. KWARTO — {night ? 'NIGHT' : 'DAY'}</span>
+    </span>
+  )
 }
 
 function setHash(hash: string) {
@@ -303,7 +334,17 @@ export default function App() {
   return (
     <div className={`app${night ? ' app--night' : ''}`} ref={appRef}>
       <div className="stage">
-        <Suspense fallback={<div className="loading">Fixing up the room…</div>}>
+        <Suspense
+          fallback={
+            <div className="loading" role="status">
+              <div className="leader" aria-hidden>
+                <span className="leader__sweep" />
+                <span className="leader__cross" />
+              </div>
+              <span className="loading__text">Setting up the room…</span>
+            </div>
+          }
+        >
           <Room
             night={night}
             cozy={cozy}
@@ -343,38 +384,60 @@ export default function App() {
       </div>
 
       {view === 'landing' && <div className="landing-dim" aria-hidden />}
-      {view === 'landing' && (
-        <div className="landing-scroll" ref={scroller} onScroll={onLandingScroll}>
+      {(view === 'landing' || view === 'arriving') && (
+        <div className={`landing-scroll${view === 'arriving' ? ' landing--leaving' : ''}`} ref={scroller} onScroll={onLandingScroll}>
         <section className="welcome" aria-label="Welcome">
+          <div className="grain" aria-hidden />
+          <div className="frame-corners" aria-hidden>
+            <i />
+            <i />
+            <i />
+            <i />
+          </div>
+          <header className="cine-bar cine-bar--top">
+            <Slug night={night} />
+            <span className="cine-bar__mid hide-sm">Reel 01 · a portfolio in one room</span>
+            <span className="cine-bar__tc">
+              MNL <Timecode />
+            </span>
+          </header>
           <div className="welcome__card">
-            <div className="welcome__eyebrow">Mabuhay! Welcome to</div>
+            <p className="welcome__eyebrow">Mabuhay — come on in</p>
             <h1 className="welcome__title" lang="tl">
-              Kwarto ni Jaztin
+              <span>Kwarto</span> <em>ni Jaztin</em>
             </h1>
-            <div className="welcome__translation">
-              <span lang="tl">kwarto</span> (n.) · room — &ldquo;Jaztin&rsquo;s room&rdquo;
-            </div>
+            <p className="welcome__subtitle">
+              <span>
+                <i lang="tl">kwarto</i> (n.) — room. Jaztin&rsquo;s room.
+              </span>
+            </p>
             <p className="welcome__lede">{profile.headline}</p>
             <p className="welcome__text">
-              Step inside, take a seat at my desk, and open the computer to see my projects and research. Look around, too: a few things in the room
-              have stories.
+              Take a seat at my desk and open the computer for my projects and research. Look around, too: a few things in here have stories.
             </p>
             <div className="welcome__actions">
-              <button className="btn btn--primary btn--big" onClick={() => setView('arriving')} autoFocus>
-                Enter the room →
+              <button className="btn btn--cine" onClick={() => setView('arriving')} autoFocus>
+                <span aria-hidden>▶</span> Enter the room
               </button>
-              <a className="btn btn--glass" href={RESUME_URL} target="_blank" rel="noreferrer">
-                Resume
+              <a className="btn btn--ghost" href={RESUME_URL} target="_blank" rel="noreferrer">
+                Resume ↗
               </a>
             </div>
           </div>
-          <div className="welcome__foot">Built with three.js · lighting baked in Blender · {profile.location}</div>
-          <button className="welcome__more" onClick={scrollToSimple}>
-            <span>Simple version</span>
-            <span className="welcome__chevron" aria-hidden>
-              ⌄
+          <footer className="cine-bar cine-bar--bottom">
+            <span className="cine-credit hide-sm">
+              <b>Starring</b> backend &amp; databases · Filipino NLP
             </span>
-          </button>
+            <button className="welcome__more" onClick={scrollToSimple}>
+              Simple version
+              <span className="welcome__chevron" aria-hidden>
+                ↓
+              </span>
+            </button>
+            <span className="cine-credit cine-credit--right hide-sm">
+              <b>Shot in</b> Manila · lit in Blender · three.js
+            </span>
+          </footer>
         </section>
         <section id="simple" className="simple-section" aria-label="Simple version">
           <div className="simple-section__handle" aria-hidden />
@@ -391,17 +454,25 @@ export default function App() {
 
       {view === 'room' && (
         <>
+          <div className="viewfinder" aria-hidden>
+            <i />
+            <i />
+            <i />
+            <i />
+          </div>
           <header className="hud hud--top">
-            <div className="nametag">
-              <div className="nametag__name">{profile.name}</div>
-              <div className="nametag__role">Backend &amp; databases · Filipino NLP</div>
+            <div className="hud__slug">
+              <Slug night={night} />
+              <span className="cine-bar__tc hide-sm">
+                MNL <Timecode />
+              </span>
             </div>
             <div className="hud__actions">
-              <a className="btn btn--glass" href={RESUME_URL} target="_blank" rel="noreferrer">
-                Resume
+              <a className="btn btn--ghost btn--sm" href={RESUME_URL} target="_blank" rel="noreferrer">
+                Resume ↗
               </a>
               <button
-                className="btn btn--glass"
+                className="btn btn--ghost btn--sm"
                 onClick={() => {
                   setWantSimple(true)
                   setView('landing')
@@ -411,44 +482,48 @@ export default function App() {
               </button>
             </div>
           </header>
+          <div className="lower-third">
+            <div className="lower-third__name">{profile.name}</div>
+            <div className="lower-third__role">Backend &amp; databases · Filipino NLP</div>
+          </div>
           {focus ? (
             <>
-              <button className="btn btn--glass focus-back" onClick={() => setFocus(null)} autoFocus>
+              <button className="btn btn--ghost btn--sm focus-back" onClick={() => setFocus(null)} autoFocus>
                 ← Back
               </button>
               <div className="hud hud--bottom">
                 {focus === 'certs' ? (
-                  <button className="btn btn--primary" onClick={() => goToLaptop('credentials')}>
+                  <button className="btn btn--cine" onClick={() => goToLaptop('credentials')}>
                     See all my credentials →
                   </button>
                 ) : (
-                  <span className="hint">My corkboard · Esc to step back</span>
+                  <span className="hud__hint">My corkboard · Esc to step back</span>
                 )}
               </div>
             </>
           ) : (
-            <>
-              <button className="look look--left" onClick={() => turn(-1)} disabled={look === 0} aria-label="Look left">
-                ‹
-              </button>
-              <button className="look look--right" onClick={() => turn(1)} disabled={look === 2} aria-label="Look right">
-                ›
-              </button>
-              <div className="look-dots" aria-hidden>
-                {[0, 1, 2].map((i) => (
-                  <span key={i} className={i === look ? 'look-dot look-dot--on' : 'look-dot'} />
+            <div className="hud hud--bottom">
+              <nav className="shots" aria-label="Look around">
+                {SHOTS.map((name, i) => (
+                  <button key={name} className={`shot${i === look ? ' shot--on' : ''}`} onClick={() => setLook(i)} aria-current={i === look}>
+                    <span className="shot__n">{i + 1}</span>
+                    {name}
+                  </button>
                 ))}
-              </div>
-              <div className="hud hud--bottom">
-                <span className="hint">
-                  <span className="hint--mouse">‹ › or rest at the edge to look around</span>
-                  <span className="hint--touch">Swipe to look around</span> · click things · the computer has everything
-                </span>
-              </div>
-            </>
+              </nav>
+              <span className="hud__hint">
+                <span className="hint--mouse">← → or rest at an edge to look around</span>
+                <span className="hint--touch">Swipe to look around</span> · click anything that glows
+              </span>
+            </div>
           )}
           {card && extra && (
             <aside className="extra" role="dialog" aria-label={card.title}>
+              <div className="extra__slate" aria-hidden>
+                <span>
+                  Scene · <b>{extra}</b>
+                </span>
+              </div>
               <button className="extra__close" onClick={() => setExtra(null)} aria-label="Close">
                 ×
               </button>

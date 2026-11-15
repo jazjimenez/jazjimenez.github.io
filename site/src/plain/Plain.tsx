@@ -21,7 +21,10 @@ export default function Plain({ onEnterRoom, webgl }: { onEnterRoom: () => void;
   return (
     <main className="sv" aria-label={`${profile.name}: profile`}>
       <header className="sv-head">
-        <div className="sv-weave" aria-hidden />
+        <div className="sv-strip" aria-hidden>
+          <span>Kwarto ni Jaztin</span>
+          <span>Press kit · simple version</span>
+        </div>
         <p className="sv-kicker">Portfolio · simple version</p>
         <h1 className="sv-name">{profile.name}</h1>
         <p className="sv-role">{profile.headline}</p>
@@ -49,7 +52,7 @@ export default function Plain({ onEnterRoom, webgl }: { onEnterRoom: () => void;
         </ul>
         {webgl && (
           <button className="sv-room" onClick={onEnterRoom}>
-            ✦ Enter the 3D room instead
+            ▶ Enter the 3D room instead
           </button>
         )}
       </header>

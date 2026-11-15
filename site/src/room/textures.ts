@@ -573,25 +573,43 @@ export function codeEditorTexture() {
 
 /** The external monitor: wallpaper + dock, like the real desktop (16:9). */
 export function monitorTexture() {
-  return canvasTexture(1024, 576, (g) => {
-    const grad = g.createLinearGradient(0, 0, 1024, 576)
-    grad.addColorStop(0, '#3a2e5a')
-    grad.addColorStop(0.6, '#8a4a5a')
-    grad.addColorStop(1, '#e8a33a')
-    g.fillStyle = grad
+  // Matches the desktop's darkroom wallpaper (index.css .desktop), so leaning in is seamless.
+  const draw = (g: CanvasRenderingContext2D) => {
+    g.fillStyle = '#1d1410'
+    const base = g.createLinearGradient(0, 0, 1024, 576)
+    base.addColorStop(0, '#1d1410')
+    base.addColorStop(0.55, '#3a2116')
+    base.addColorStop(1, '#6b3a1c')
+    g.fillStyle = base
     g.fillRect(0, 0, 1024, 576)
-    g.fillStyle = 'rgba(0,0,0,.35)'
+    const glow = (x: number, y: number, r: number, color: string) => {
+      const gr = g.createRadialGradient(x, y, 0, x, y, r)
+      gr.addColorStop(0, color)
+      gr.addColorStop(1, 'rgba(0,0,0,0)')
+      g.fillStyle = gr
+      g.fillRect(0, 0, 1024, 576)
+    }
+    glow(120, 640, 620, 'rgba(242,169,59,.9)')
+    glow(1060, -40, 480, 'rgba(255,74,43,.55)')
+    g.fillStyle = 'rgba(244,234,216,.06)'
+    g.font = 'italic 400 330px "Instrument Serif", Georgia, serif'
+    g.fillText('Kwarto', 300, 600)
+    g.fillStyle = 'rgba(11,10,9,.55)'
     g.fillRect(0, 0, 1024, 26)
-    g.fillStyle = '#fff'
+    g.fillStyle = '#ff4a2b'
+    g.beginPath()
+    g.arc(22, 13, 5, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#f4ead8'
     g.font = '600 15px Inter, sans-serif'
-    g.fillText('Jaztin', 18, 18)
+    g.fillText('Jaztin', 36, 18)
     ;['#4a8ad8', '#ffffff', '#ffffff', '#4a8ad8', '#2e6b5e'].forEach((c, i) => {
       g.fillStyle = c
       g.beginPath()
       g.roundRect(950, 52 + i * 78, 50, 46, 9)
       g.fill()
     })
-    g.fillStyle = 'rgba(255,255,255,.3)'
+    g.fillStyle = 'rgba(11,10,9,.45)'
     g.beginPath()
     g.roundRect(330, 512, 364, 52, 14)
     g.fill()
@@ -601,13 +619,27 @@ export function monitorTexture() {
       g.roundRect(344 + i * 58, 520, 40, 36, 9)
       g.fill()
     })
-    g.fillStyle = 'rgba(255,255,255,.95)'
-    g.font = '700 54px Inter, sans-serif'
-    g.fillText("Hi, I'm Jaztin.", 70, 380)
-    g.font = '500 20px Inter, sans-serif'
-    g.fillStyle = 'rgba(255,255,255,.8)'
-    g.fillText('click to open my computer', 72, 416)
+    g.fillStyle = '#f4ead8'
+    g.font = '400 76px "Instrument Serif", Georgia, serif'
+    g.fillText('Hi, I\u2019m', 70, 372)
+    const w = g.measureText('Hi, I\u2019m ').width
+    g.fillStyle = '#f2a93b'
+    g.font = 'italic 400 76px "Instrument Serif", Georgia, serif'
+    g.fillText('Jaztin.', 70 + w, 372)
+    g.font = '500 18px "JetBrains Mono", monospace'
+    g.fillStyle = 'rgba(244,234,216,.75)'
+    g.fillText('CLICK TO OPEN MY COMPUTER', 72, 414)
+  }
+  const tex = canvasTexture(1024, 576, draw)
+  // redraw once the display font has loaded (the first draw may have used the fallback)
+  document.fonts?.load('76px "Instrument Serif"').then(() => {
+    const canvas = tex.image as HTMLCanvasElement
+    const g = canvas.getContext('2d')
+    if (!g) return
+    draw(g)
+    tex.needsUpdate = true
   })
+  return tex
 }
 
 /** Keycaps for the low-profile keyboard (white keys on aluminium). */
