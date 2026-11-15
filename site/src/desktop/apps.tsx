@@ -3,6 +3,7 @@ import { credentials, letterboxd, profile, projects, roomExtras, TMDB_CREDIT } f
 import { EXAMPLE_WORDS, lookup, type Trace } from '../data/tagabaybay'
 import type { OpenApp } from './Desktop'
 import { AppIcon } from './icons'
+import { pub, pubList, realEmail, realLink } from '../data/publish'
 
 const RESUME_URL = `${import.meta.env.BASE_URL}${profile.resume}`
 
@@ -31,7 +32,7 @@ export function FinderApp({ open }: { open: OpenApp }) {
             <button key={p.id} className="finder__item" onClick={() => open('project', p.id)}>
               <AppIcon kind={p.app === 'tagabaybay' ? 'tagabaybay' : 'doc'} size={58} />
               <span className="finder__name">{p.title}</span>
-              <span className="finder__meta">{p.year}</span>
+              <span className="finder__meta">{pub(p.year)}</span>
             </button>
           ))}
           <div className="finder__item finder__item--ghost" title="New projects land here">
@@ -50,31 +51,43 @@ export function FinderApp({ open }: { open: OpenApp }) {
 export function ProjectApp({ id, open }: { id: string; open: OpenApp }) {
   const p = projects.find((x) => x.id === id)
   if (!p) return <div className="doc">Project not found.</div>
+  // anything still marked TODO in content.ts stays hidden (see data/publish.ts)
+  const meta = [pub(p.year), pub(p.role)].filter(Boolean).join(' · ')
+  const summary = pubList(p.summary)
+  const highlights = pubList(p.highlights)
+  const stack = pubList(p.stack)
   return (
     <article className="doc">
-      <div className="doc__eyebrow">
-        {p.year} · {p.role}
-      </div>
+      {meta && <div className="doc__eyebrow">{meta}</div>}
       <h1 className="doc__title">{p.title}</h1>
-      <p className="doc__lede">{p.tagline}</p>
-      {p.status && <div className="badge">{p.status}</div>}
-      {p.summary.map((s, i) => (
+      {pub(p.tagline) && <p className="doc__lede">{pub(p.tagline)}</p>}
+      {pub(p.status) && <div className="badge">{pub(p.status)}</div>}
+      {summary.map((s, i) => (
         <p key={i}>{s}</p>
       ))}
-      <h3>Highlights</h3>
-      <ul>
-        {p.highlights.map((h, i) => (
-          <li key={i}>{h}</li>
-        ))}
-      </ul>
-      <h3>Built with</h3>
-      <div className="chips">
-        {p.stack.map((s) => (
-          <span key={s} className="chip">
-            {s}
-          </span>
-        ))}
-      </div>
+      {summary.length === 0 && <p className="muted">More about this project soon.</p>}
+      {highlights.length > 0 && (
+        <>
+          <h3>Highlights</h3>
+          <ul>
+            {highlights.map((h, i) => (
+              <li key={i}>{h}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {stack.length > 0 && (
+        <>
+          <h3>Built with</h3>
+          <div className="chips">
+            {stack.map((s) => (
+              <span key={s} className="chip">
+                {s}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
       <div className="doc__actions">
         {p.app === 'tagabaybay' && (
           <button className="btn btn--primary" onClick={() => open('tagabaybay')}>
@@ -108,7 +121,7 @@ export function AboutApp({ open }: { open: OpenApp }) {
         </div>
       </div>
       <p className="doc__lede">{profile.headline}</p>
-      {profile.about.map((s, i) => (
+      {pubList(profile.about).map((s, i) => (
         <p key={i}>{s}</p>
       ))}
       <h3>What I'm into</h3>
@@ -150,9 +163,7 @@ export function ResumeApp() {
       <div className="doc doc--center">
         <AppIcon kind="pdf" size={72} />
         <h3>Resume coming soon</h3>
-        <p className="muted">
-          (Site owner: put your resume at <code>site/public/resume.pdf</code> and it will show up here.)
-        </p>
+        <p className="muted">In the meantime, the simple version of this site has everything a resume would.</p>
       </div>
     )
   return (
@@ -177,15 +188,15 @@ export function CredentialsApp() {
     <div className="doc">
       <h1 className="doc__title">Credentials</h1>
       <ul className="creds">
-        {credentials.map((c, i) => (
+        {credentials
+          .filter((c) => pub(c.title))
+          .map((c, i) => (
           <li key={i} className="creds__item">
             <div className="creds__icon">🎓</div>
             <div>
-              <div className="creds__title">{c.title}</div>
-              <div className="muted">
-                {c.issuer} · {c.date}
-              </div>
-              {c.detail && <div className="creds__detail">{c.detail}</div>}
+              <div className="creds__title">{pub(c.title)}</div>
+              <div className="muted">{[pub(c.issuer), pub(c.date)].filter(Boolean).join(' · ')}</div>
+              {pub(c.detail) && <div className="creds__detail">{pub(c.detail)}</div>}
             </div>
           </li>
         ))}
@@ -346,13 +357,17 @@ export function TerminalApp({ open, onExit }: { open: OpenApp; onExit: () => voi
         return [{ kind: 'out', text: `${arg} → ${t.nativized}\n${t.steps.map((s) => `  ${s.from} → ${s.to}   (${s.rule})`).join('\n')}` }]
       }
       case 'cat':
-        if (arg === 'about' || arg === 'about.txt') return [{ kind: 'out', text: profile.about.join('\n\n') }]
+        if (arg === 'about' || arg === 'about.txt') return [{ kind: 'out', text: pubList(profile.about).join('\n\n') }]
         return [{ kind: 'err', text: `cat: ${arg || '(none)'}: No such file — try 'cat about'` }]
       case 'resume':
         open('resume')
         return [{ kind: 'out', text: 'opening Resume.pdf…' }]
       case 'contact':
-        return [{ kind: 'out', text: [`email: ${profile.email}`, ...profile.links.map((l) => `${l.label.toLowerCase()}: ${l.url}`)].join('\n') }]
+      {
+        const email = realEmail(profile.email)
+        const lines = [...(email ? [`email: ${email}`] : []), ...profile.links.filter(realLink).map((l) => `${l.label.toLowerCase()}: ${l.url}`)]
+        return [{ kind: 'out', text: lines.length ? lines.join('\n') : 'contact details coming soon. try: resume' }]
+      }
       case 'room':
       case 'exit':
         setTimeout(onExit, 300)
@@ -451,12 +466,16 @@ export function FilmsApp() {
       </div>
       <p className="muted">{f.note}</p>
       <p className="muted films__credit">{TMDB_CREDIT}</p>
-      <h3>Listening</h3>
-      <ul>
-        {m.lines.map((l) => (
-          <li key={l}>{l}</li>
-        ))}
-      </ul>
+      {pubList([...m.lines]).length > 0 && (
+        <>
+          <h3>Listening</h3>
+          <ul>
+            {pubList([...m.lines]).map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   )
 }
@@ -467,14 +486,21 @@ export function ContactApp() {
       <h1 className="doc__title">Say hello 👋</h1>
       <p>I'm looking for roles in backend / database engineering and NLP. The fastest way to reach me:</p>
       <div className="doc__actions doc__actions--col">
-        <a className="btn btn--primary" href={`mailto:${profile.email}`}>
-          ✉ {profile.email}
-        </a>
-        {profile.links.map((l) => (
+        {realEmail(profile.email) && (
+          <a className="btn btn--primary" href={`mailto:${realEmail(profile.email)}`}>
+            ✉ {realEmail(profile.email)}
+          </a>
+        )}
+        {profile.links.filter(realLink).map((l) => (
           <a key={l.url} className="btn" href={l.url} target="_blank" rel="noreferrer">
             {l.label} ↗
           </a>
         ))}
+        {!realEmail(profile.email) && profile.links.filter(realLink).length === 0 && (
+          <a className="btn btn--primary" href={RESUME_URL} target="_blank" rel="noreferrer">
+            See my resume ↗
+          </a>
+        )}
       </div>
     </div>
   )
