@@ -37,7 +37,9 @@ export const profile = {
     'Outside of code: films and music, probably in that order. (TODO: add a line or two in your own voice.)',
   ],
   interests: ['Database design', 'Backend systems', 'Data pipelines', 'Filipino NLP', 'Speech & audio-visual data', 'Films', 'Music'],
-  email: 'you@example.com', // TODO: your email
+  email: 'jaztin.jcj@gmail.com',
+  /** Shown as written; the tel: link uses the digits. */
+  phone: '+63 928 228 8177',
   links: [
     { label: 'GitHub', url: 'https://github.com/' }, // TODO: your GitHub profile
     { label: 'LinkedIn', url: 'https://www.linkedin.com/' }, // TODO: your LinkedIn

@@ -23,6 +23,9 @@ export const realLink = (l: Link) => {
   }
 }
 
+/** "+63 928 228 8177" → "tel:+639282288177" */
+export const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`
+
 export const realEmail = (e: string) => (/@example\.com$/.test(e) || !e.includes('@') ? '' : e)
 
 /** "https://www.github.com/x/" → "github.com/x" (shown next to links, so the address itself is readable). */

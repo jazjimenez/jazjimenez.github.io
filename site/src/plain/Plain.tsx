@@ -1,5 +1,5 @@
 import { credentials, education, letterboxd, papers, profile, projects, skills } from '../data/content'
-import { pub, pubList, realEmail, realLink, shortUrl } from '../data/publish'
+import { pub, pubList, realEmail, realLink, shortUrl, telHref } from '../data/publish'
 
 const RESUME_URL = `${import.meta.env.BASE_URL}${profile.resume}`
 
@@ -33,6 +33,12 @@ export default function Plain({ onEnterRoom, webgl }: { onEnterRoom: () => void;
             <li>
               <span className="sv-k">Email</span>
               <a href={`mailto:${email}`}>{email}</a>
+            </li>
+          )}
+          {profile.phone && (
+            <li>
+              <span className="sv-k">Phone</span>
+              <a href={telHref(profile.phone)}>{profile.phone}</a>
             </li>
           )}
           {links.map((l) => (
