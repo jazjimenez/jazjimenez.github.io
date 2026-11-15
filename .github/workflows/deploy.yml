@@ -31,6 +31,21 @@ jobs:
           cache-dependency-path: site/package-lock.json
       - run: npm ci
       - run: npm run build
+      # While the room-v2 branch exists, publish it next to the live site at /v2/ so the two can be
+      # compared. It's hidden from search engines; re-run this workflow to refresh it.
+      - name: Build the room-v2 preview into /v2/
+        run: |
+          if git ls-remote --exit-code --heads origin room-v2 > /dev/null; then
+            git fetch --depth 1 origin room-v2
+            git worktree add "$RUNNER_TEMP/v2" FETCH_HEAD
+            (cd "$RUNNER_TEMP/v2/site" && npm ci && npm run build)
+            mkdir -p dist/v2
+            cp -R "$RUNNER_TEMP/v2/site/dist/." dist/v2/
+            sed -i 's#<head>#<head><meta name="robots" content="noindex" />#' dist/v2/index.html
+            rm -f dist/v2/robots.txt dist/v2/sitemap.xml
+          else
+            echo "no room-v2 branch; skipping the preview"
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site/dist

@@ -387,9 +387,16 @@ export default function FirstPersonRig({
     // Coming back to the chair from anything else (zoom, screen, flight in): pick the springs up
     // from wherever the camera is pointing now, so the hand-over is seamless.
     if (ms.branch !== 'seat') {
-      tmp.normal.set(0, 0, -1).applyQuaternion(camera.quaternion)
-      yaw.current = Math.atan2(-tmp.normal.x, -tmp.normal.z)
-      basePitch.current = Math.asin(THREE.MathUtils.clamp(tmp.normal.y, -1, 1)) + pitchOffset.current
+      if (ms.branch === '') {
+        // first frame of all (opened straight into the room): start at the view, don't swing to it
+        yaw.current = LOOK_YAWS[look]
+        basePitch.current = LOOK_PITCHES[look]
+        camera.position.copy(SEAT_EYE)
+      } else {
+        tmp.normal.set(0, 0, -1).applyQuaternion(camera.quaternion)
+        yaw.current = Math.atan2(-tmp.normal.x, -tmp.normal.z)
+        basePitch.current = Math.asin(THREE.MathUtils.clamp(tmp.normal.y, -1, 1)) + pitchOffset.current
+      }
       ms.yawV = ms.pitchV = ms.gx = ms.gxV = ms.gy = ms.gyV = 0
       posV.set(0, 0, 0)
       ms.branch = 'seat'
