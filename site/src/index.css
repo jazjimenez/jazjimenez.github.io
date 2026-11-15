@@ -891,7 +891,7 @@ code,
   background: radial-gradient(ellipse at 85% 110%, rgba(47, 143, 122, 0.55) 0%, transparent 55%),
     radial-gradient(ellipse at -5% -10%, rgba(242, 169, 59, 0.22) 0%, transparent 45%), linear-gradient(170deg, #040b0a, #0a1c19 55%, #0f2c27);
 }
-.desktop--lab::before {
+.desktop.desktop--lab::before {
   content: 'ᜊ';
   font: 400 52vw/1 'Noto Sans Tagalog', var(--display);
   right: 2vw;
@@ -2013,12 +2013,7 @@ body:has(> #root > .sv) {
   background: rgba(11, 10, 9, 0.78);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
-  animation: subtitle-in 0.35s ease-out;
-}
-@keyframes subtitle-in {
-  from {
-    opacity: 0;
-  }
+  /* cuts in like real subtitles: no fade, so it can never be caught invisible */
 }
 .commentary__skip {
   border: 0;
