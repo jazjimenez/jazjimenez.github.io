@@ -109,7 +109,7 @@ export default function Room(props: Props) {
         gl={{ antialias: true, powerPreference: 'high-performance', stencil: false }}
       >
         {/* dark "showcase" backdrop behind the dollhouse on the welcome page */}
-        <color attach="background" args={[props.intro !== 'done' ? '#1f1a24' : props.night ? '#0d0b14' : '#d9cbb5']} />
+        <color attach="background" args={[props.intro !== 'done' ? '#0b0a09' : props.night ? '#0d0b14' : '#d9cbb5']} />
         {baked ? <BakedRoomScene {...props} /> : <Scene {...props} />}
         {!baked && <StaticShadows deps={[props.night, props.rainy]} />}
         <QualityGovernor tier={tier} onChange={setTier} />

@@ -95,7 +95,7 @@ export default function Desktop({ clock, weather, night, initialApp, onExit }: P
     <div className={`desktop${night ? ' desktop--night' : ''}`}>
       <div className="menubar">
         <span className="menubar__logo" aria-hidden>
-          ✦
+          ●
         </span>
         <b>{activeTitle}</b>
         <span className="menubar__item hide-sm">File</span>
@@ -123,7 +123,9 @@ export default function Desktop({ clock, weather, night, initialApp, onExit }: P
       </div>
 
       <div className="desktop__watermark">
-        <div className="desktop__hello">Hi, I'm {profile.shortName}.</div>
+        <div className="desktop__hello">
+          Hi, I&rsquo;m <em>{profile.shortName}.</em>
+        </div>
         <div>{profile.headline}</div>
         <div className="desktop__tip">Open a folder to explore, or try TagaBaybay in the dock.</div>
       </div>
