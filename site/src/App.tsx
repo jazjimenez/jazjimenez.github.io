@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { letterboxd, papers, profile, roomExtras, TMDB_CREDIT } from './data/content'
+import { pub, pubList } from './data/publish'
 import Desktop, { type AppId } from './desktop/Desktop'
 import { setLandingPaused } from './room/landingMotion'
 import { isManilaNight, useManilaClock, useManilaWeather } from './hooks/useManila'
@@ -528,19 +529,17 @@ export default function App() {
                 ×
               </button>
               <h3>{card.title}</h3>
-              {card.lines.map((l) => (
+              {pubList([...card.lines]).map((l) => (
                 <p key={l}>{l}</p>
               ))}
+              {pubList([...card.lines]).length === 0 && <p className="muted">More on this soon.</p>}
               {extra === 'papers' && (
                 <ul className="extra__papers">
                   {papers.map((pp) => (
                     <li key={pp.title}>
-                      <div className="extra__paper-title">{pp.title}</div>
-                      <div className="muted">
-                        {pp.venue}
-                        {pp.status ? ` · ${pp.status}` : ''}
-                      </div>
-                      <div className="extra__paper-authors">{pp.authors}</div>
+                      <div className="extra__paper-title">{pub(pp.title)}</div>
+                      <div className="muted">{[pub(pp.venue), pub(pp.status)].filter(Boolean).join(' · ')}</div>
+                      <div className="extra__paper-authors">{pub(pp.authors)}</div>
                       {pp.links.length > 0 && (
                         <div className="extra__paper-links">
                           {pp.links.map((l) => (
