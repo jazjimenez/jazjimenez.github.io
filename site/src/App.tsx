@@ -2,11 +2,12 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { letterboxd, papers, profile, roomExtras, TMDB_CREDIT } from './data/content'
 import { pub, pubList } from './data/publish'
 import Desktop, { type AppId } from './desktop/Desktop'
+import { Commentary, SCENES, ScenesSlate, useGuide, WrapCredits } from './guide'
 import { setLandingPaused } from './room/landingMotion'
 import { isManilaNight, useManilaClock, useManilaWeather } from './hooks/useManila'
 import Plain from './plain/Plain'
 import type { RoomExtraKey } from './room/Room'
-import type { FocusId } from './room/screenPortal'
+import type { FocusId, ScreenId } from './room/screenPortal'
 import { PORTAL_ID } from './room/portalId'
 
 const Room = lazy(() => import('./room/Room'))
@@ -223,6 +224,13 @@ export default function App() {
     if (!focus) setLook((l) => Math.min(2, Math.max(0, l + dir)))
   }
   const [extra, setExtra] = useState<RoomExtraKey | null>(null)
+  // which screen you leaned in to: the monitor is Work, the MacBook is the Lab
+  const [screen, setScreen] = useState<ScreenId>('monitor')
+  // the guided tour: commentary on the first visit, the scenes you've found, the wrap
+  const guide = useGuide()
+  const [commentaryOn, setCommentaryOn] = useState(false)
+  const [hintId, setHintId] = useState<string | null>(null)
+  const [wrapOpen, setWrapOpen] = useState(false)
   const [initialApp, setInitialApp] = useState<AppId | undefined>()
   const clock = useManilaClock()
   const weather = useManilaWeather()
@@ -313,12 +321,31 @@ export default function App() {
     if (view !== 'room') setFocus(null)
   }, [view])
 
-  const goToLaptop = (app?: AppId) => {
+  const goToLaptop = (app?: AppId, on: ScreenId = 'monitor') => {
     setExtra(null)
     setFocus(null)
+    setCommentaryOn(false)
+    setHintId(null)
+    setScreen(on)
     setInitialApp(app)
     setView('entering')
   }
+
+  // First time in the room: the director's commentary walks you around.
+  useEffect(() => {
+    if (view === 'room' && !guide.heardCommentary) setCommentaryOn(true)
+  }, [view, guide.heardCommentary])
+  const endCommentary = () => {
+    setCommentaryOn(false)
+    setHintId(null)
+    guide.update({ heardCommentary: true })
+  }
+  // Every scene found: roll the credits (once), after a beat so the last card can be read.
+  useEffect(() => {
+    if (view !== 'room' || guide.wrapped || guide.found.length < SCENES.length) return
+    const id = setTimeout(() => setWrapOpen(true), 1600)
+    return () => clearTimeout(id)
+  }, [view, guide.wrapped, guide.found.length])
 
   // Safety net: if the 3D room isn't ready to animate the way back (e.g. still loading), don't get stuck.
   useEffect(() => {
@@ -366,7 +393,10 @@ export default function App() {
               setInitialApp(undefined)
               setView('room')
             }}
-            onOpenLaptop={() => goToLaptop()}
+            onOpenLaptop={(on) => goToLaptop(undefined, on)}
+            screen={screen}
+            hintId={view === 'room' ? hintId : null}
+            onDiscover={guide.discover}
             onOpenCredentials={() => goToLaptop('credentials')}
             onToggleNight={() => {
               setNightOverride(!night)
@@ -376,6 +406,7 @@ export default function App() {
             focus={focus}
             onFocus={(f) => {
               setExtra(null)
+              if (f && commentaryOn) endCommentary()
               setFocus(f)
             }}
             look={look}
@@ -469,6 +500,7 @@ export default function App() {
               </span>
             </div>
             <div className="hud__actions">
+              <ScenesSlate found={guide.found} onReplay={() => setCommentaryOn(true)} />
               <a className="btn btn--ghost btn--sm" href={RESUME_URL} target="_blank" rel="noreferrer">
                 Resume ↗
               </a>
@@ -504,6 +536,15 @@ export default function App() {
             </>
           ) : (
             <div className="hud hud--bottom">
+              {commentaryOn && (
+                <Commentary
+                  onLine={(l) => {
+                    if (l.look !== undefined) setLook(l.look)
+                    setHintId(l.hint ?? null)
+                  }}
+                  onDone={endCommentary}
+                />
+              )}
               <nav className="shots" aria-label="Look around">
                 {SHOTS.map((name, i) => (
                   <button key={name} className={`shot${i === look ? ' shot--on' : ''}`} onClick={() => setLook(i)} aria-current={i === look}>
@@ -517,6 +558,14 @@ export default function App() {
                 <span className="hint--touch">Swipe to look around</span> · click anything that glows
               </span>
             </div>
+          )}
+          {wrapOpen && (
+            <WrapCredits
+              onClose={() => {
+                setWrapOpen(false)
+                guide.update({ wrapped: true })
+              }}
+            />
           )}
           {card && extra && (
             <aside className="extra" role="dialog" aria-label={card.title}>
@@ -573,7 +622,7 @@ export default function App() {
               {extra === 'films' && <p className="extra__credit">{TMDB_CREDIT}</p>}
               {extra === 'jeepney' && (
                 <button className="btn btn--primary" onClick={() => goToLaptop()}>
-                  Sakay na → laptop
+                  Sakay na → my work
                 </button>
               )}
               {(extra === 'films' || extra === 'music') && (
@@ -593,7 +642,14 @@ export default function App() {
           className={`screen-portal${view === 'desktop' ? '' : ' screen-portal--moving'}`}
           style={view === 'entering' ? { opacity: 0 } : undefined}
         >
-          <Desktop clock={clock.label} weather={weather} night={night} initialApp={initialApp} onExit={() => setView('leaving')} />
+          <Desktop
+            clock={clock.label}
+            weather={weather}
+            night={night}
+            initialApp={initialApp}
+            mode={screen === 'laptop' ? 'lab' : 'work'}
+            onExit={() => setView('leaving')}
+          />
         </div>
       )}
     </div>
