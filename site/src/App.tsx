@@ -231,6 +231,7 @@ export default function App() {
   const [commentaryOn, setCommentaryOn] = useState(false)
   const [hintId, setHintId] = useState<string | null>(null)
   const [wrapOpen, setWrapOpen] = useState(false)
+  const [roomReady, setRoomReady] = useState(false)
   const [initialApp, setInitialApp] = useState<AppId | undefined>()
   const clock = useManilaClock()
   const weather = useManilaWeather()
@@ -333,8 +334,8 @@ export default function App() {
 
   // First time in the room: the director's commentary walks you around.
   useEffect(() => {
-    if (view === 'room' && !guide.heardCommentary) setCommentaryOn(true)
-  }, [view, guide.heardCommentary])
+    if (view === 'room' && roomReady && !guide.heardCommentary) setCommentaryOn(true)
+  }, [view, roomReady, guide.heardCommentary])
   const endCommentary = () => {
     setCommentaryOn(false)
     setHintId(null)
@@ -397,6 +398,7 @@ export default function App() {
             screen={screen}
             hintId={view === 'room' ? hintId : null}
             onDiscover={guide.discover}
+            onReady={() => setRoomReady(true)}
             onOpenCredentials={() => goToLaptop('credentials')}
             onToggleNight={() => {
               setNightOverride(!night)

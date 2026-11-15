@@ -65,6 +65,8 @@ type Props = {
   hintId: string | null
   /** Called whenever an object is clicked, for the "scenes found" tracker. */
   onDiscover: (id: string) => void
+  /** The room has loaded and is on screen. */
+  onReady?: () => void
   /** Zoomed in on something from the chair (the corkboard), or null. */
   focus: FocusId | null
   onFocus: (f: FocusId | null) => void
@@ -132,6 +134,15 @@ export default function Room(props: Props) {
 
 const NO_CLICKS: ClickSpec[] = []
 
+/** Tell the app once the scene is mounted (i.e. everything it suspended on has loaded). */
+function useReady(onReady?: () => void) {
+  const cb = useRef(onReady)
+  cb.current = onReady
+  useEffect(() => {
+    cb.current?.()
+  }, [])
+}
+
 /** Open the desktop on the screen you clicked: the monitor (Work) or the MacBook (Lab). */
 function openOn(p: Props, id: ScreenId) {
   activeScreen.id = id
@@ -148,6 +159,7 @@ function lampLabel(p: Props) {
 
 /** Baked room: same camera, sunbeams and interactions, but all lighting comes from the lightmaps. */
 function BakedRoomScene(p: Props) {
+  useReady(p.onReady)
   const [playing, setPlaying] = useState(false)
   const clickables: ClickSpec[] = [
     { id: 'monitor', label: 'Work — projects & résumé', labelY: 0.62, hint: p.laptopMode === 'seat' && p.intro === 'done' && !p.focus && !p.hintId, onClick: () => openOn(p, 'monitor') },
@@ -208,6 +220,7 @@ function Scene(p: Props) {
 }
 
 function SceneObjects(p: Props) {
+  useReady(p.onReady)
   const clockFace = useMemo(() => clockFaceTexture(), [])
   const invalidate = useThree((s) => s.invalidate)
   // posters / corkboard photos arrive after load: redraw once they do
