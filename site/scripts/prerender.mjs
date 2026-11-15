@@ -33,6 +33,7 @@ try {
     jobTitle: 'Software Developer (Backend & Databases)',
     description: profile.summary,
     ...(email && { email: `mailto:${email}` }),
+    ...(profile.phone && { telephone: profile.phone }),
     address: { '@type': 'PostalAddress', addressLocality: 'Manila', addressCountry: 'PH' },
     alumniOf: { '@type': 'CollegeOrUniversity', name: 'De La Salle University', address: 'Manila, Philippines' },
     knowsAbout: [...new Set(skills.flatMap((g) => pubList(g.items)).concat(profile.interests.slice(0, 5)))],
@@ -77,6 +78,7 @@ try {
   md.push(`# ${profile.name}`, '', `> ${profile.headline}`, '', profile.summary, '')
   md.push('## Contact', '')
   if (email) md.push(`- Email: ${email}`)
+  if (profile.phone) md.push(`- Phone: ${profile.phone}`)
   for (const l of links) md.push(`- ${l.label}: ${l.url}`)
   md.push(`- Website: ${site}`, `- Resume (PDF): ${new URL(profile.resume, site)}`, `- Location: ${profile.location}`, '')
   md.push('## At a glance', '', '- Focus: Backend development, database design, Filipino NLP research')

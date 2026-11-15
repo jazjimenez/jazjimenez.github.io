@@ -3,7 +3,7 @@ import { credentials, letterboxd, profile, projects, roomExtras, TMDB_CREDIT } f
 import { EXAMPLE_WORDS, lookup, type Trace } from '../data/tagabaybay'
 import type { OpenApp } from './Desktop'
 import { AppIcon } from './icons'
-import { pub, pubList, realEmail, realLink } from '../data/publish'
+import { pub, pubList, realEmail, realLink, telHref } from '../data/publish'
 
 const RESUME_URL = `${import.meta.env.BASE_URL}${profile.resume}`
 
@@ -365,7 +365,7 @@ export function TerminalApp({ open, onExit }: { open: OpenApp; onExit: () => voi
       case 'contact':
       {
         const email = realEmail(profile.email)
-        const lines = [...(email ? [`email: ${email}`] : []), ...profile.links.filter(realLink).map((l) => `${l.label.toLowerCase()}: ${l.url}`)]
+        const lines = [...(email ? [`email: ${email}`] : []), ...(profile.phone ? [`phone: ${profile.phone}`] : []), ...profile.links.filter(realLink).map((l) => `${l.label.toLowerCase()}: ${l.url}`)]
         return [{ kind: 'out', text: lines.length ? lines.join('\n') : 'contact details coming soon. try: resume' }]
       }
       case 'room':
@@ -489,6 +489,11 @@ export function ContactApp() {
         {realEmail(profile.email) && (
           <a className="btn btn--primary" href={`mailto:${realEmail(profile.email)}`}>
             ✉ {realEmail(profile.email)}
+          </a>
+        )}
+        {profile.phone && (
+          <a className="btn" href={telHref(profile.phone)}>
+            ☎ {profile.phone}
           </a>
         )}
         {profile.links.filter(realLink).map((l) => (
