@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { credentials, letterboxd, profile, projects, roomExtras, TMDB_CREDIT } from '../data/content'
+import { credentials, letterboxd, papers, profile, projects, roomExtras, TMDB_CREDIT } from '../data/content'
 import { EXAMPLE_WORDS, lookup, type Trace } from '../data/tagabaybay'
 import type { OpenApp } from './Desktop'
 import { AppIcon } from './icons'
@@ -100,6 +100,37 @@ export function ProjectApp({ id, open }: { id: string; open: OpenApp }) {
           </a>
         ))}
       </div>
+    </article>
+  )
+}
+
+/* ---------- Papers (the Lab) ---------- */
+
+export function PapersApp() {
+  return (
+    <article className="doc">
+      <div className="doc__eyebrow">The Lab · research</div>
+      <h1 className="doc__title">Papers</h1>
+      <ol className="papers">
+        {papers
+          .filter((p) => pub(p.title))
+          .map((p) => (
+            <li key={p.title}>
+              <div className="papers__title">{pub(p.title)}</div>
+              <div className="muted">{[pub(p.venue), pub(p.status)].filter(Boolean).join(' · ')}</div>
+              {pub(p.authors) && <div className="papers__authors">{pub(p.authors)}</div>}
+              {p.links.length > 0 && (
+                <div className="doc__actions">
+                  {p.links.map((l) => (
+                    <a key={l.url} className="btn" href={l.url} target="_blank" rel="noreferrer">
+                      {l.label} ↗
+                    </a>
+                  ))}
+                </div>
+              )}
+            </li>
+          ))}
+      </ol>
     </article>
   )
 }

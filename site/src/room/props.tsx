@@ -17,6 +17,7 @@ import { focusTargets, SCREEN_H, SCREEN_SIZE, SCREEN_W, screens } from './screen
 import { CORK, liveCorkboard, livePoster } from './liveTextures'
 import { education, letterboxd, papers } from '../data/content'
 import { pub, pubList } from '../data/publish'
+import { JeepneyV2 } from './props2'
 
 export const WOOD = '#8a4b22'
 export const WOOD_DARK = '#5e3216'
@@ -315,52 +316,9 @@ export function MonoblocChair() {
 
 export function Jeepney() {
   const sign = useMemo(() => signboardTexture(), [])
-  const wheels: [number, number][] = [
-    [-0.11, 0.06],
-    [0.11, 0.06],
-    [-0.11, -0.06],
-    [0.11, -0.06],
-  ]
   return (
-    <group rotation={[0, -0.45, 0]} scale={0.7}>
-      {/* body */}
-      <RoundedBox args={[0.34, 0.09, 0.13]} radius={0.015} position={[0.02, 0.07, 0]} castShadow>
-        <meshStandardMaterial color="#d63a2f" metalness={0.3} roughness={0.4} />
-      </RoundedBox>
-      {/* stripe */}
-      <mesh position={[0.02, 0.075, 0.066]}>
-        <planeGeometry args={[0.32, 0.018]} />
-        <meshStandardMaterial color="#f2c94c" />
-      </mesh>
-      {/* hood */}
-      <RoundedBox args={[0.1, 0.06, 0.12]} radius={0.012} position={[-0.18, 0.055, 0]} castShadow>
-        <meshStandardMaterial color="#c9ccd1" metalness={0.8} roughness={0.25} />
-      </RoundedBox>
-      {/* roof */}
-      <RoundedBox args={[0.36, 0.02, 0.15]} radius={0.008} position={[0.02, 0.16, 0]} castShadow>
-        <meshStandardMaterial color="#2e6bb8" />
-      </RoundedBox>
-      {/* windows */}
-      <mesh position={[0.03, 0.135, 0.0655]}>
-        <planeGeometry args={[0.28, 0.03]} />
-        <meshStandardMaterial color="#1d2633" />
-      </mesh>
-      {/* signboard */}
-      <mesh position={[-0.12, 0.185, 0]} rotation={[0, -Math.PI / 2, 0]}>
-        <planeGeometry args={[0.13, 0.035]} />
-        <meshBasicMaterial map={sign} side={THREE.DoubleSide} />
-      </mesh>
-      {/* chrome horse on the hood */}
-      <mesh position={[-0.22, 0.1, 0]}>
-        <coneGeometry args={[0.012, 0.04, 6]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={1} roughness={0.15} />
-      </mesh>
-      {wheels.map(([x, z], i) => (
-        <mesh key={i} position={[x, 0.025, z]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.025, 0.025, 0.02, 14]} />
-          <meshStandardMaterial color="#1a1a1a" />
-        </mesh>
-      ))}
+    <group rotation={[0, -0.45, 0]} scale={0.75}>
+      <JeepneyV2 sign={sign} />
     </group>
   )
 }
