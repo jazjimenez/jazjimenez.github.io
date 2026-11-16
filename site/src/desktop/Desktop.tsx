@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { profile, projects } from '../data/content'
+import { projects } from '../data/content'
 import type { Weather } from '../hooks/useManila'
-import { AboutApp, ContactApp, CredentialsApp, FilmsApp, FinderApp, ProjectApp, ResumeApp, TagaBaybayApp, TerminalApp } from './apps'
+import { AboutApp, ContactApp, CredentialsApp, FilmsApp, FinderApp, PapersApp, ProjectApp, ResumeApp, TagaBaybayApp, TerminalApp } from './apps'
 import { AppIcon, type IconKind } from './icons'
 
-export type AppId = 'finder' | 'about' | 'resume' | 'credentials' | 'tagabaybay' | 'terminal' | 'films' | 'contact' | 'project'
+export type AppId = 'finder' | 'about' | 'resume' | 'credentials' | 'tagabaybay' | 'terminal' | 'films' | 'contact' | 'project' | 'papers'
+
+/**
+ * Two screens, two jobs. The monitor is Work (the engineer: projects, résumé, credentials, contact);
+ * the MacBook is the Lab (the researcher: TagaBaybay, papers, the thesis, a terminal).
+ */
+export type DesktopMode = 'work' | 'lab'
 
 export type OpenApp = (app: AppId, arg?: string) => void
 
@@ -31,17 +37,40 @@ const META: Record<AppId, { title: string; icon: IconKind; w: number; h: number 
   films: { title: 'Films', icon: 'films', w: 480, h: 380 },
   contact: { title: 'Contact', icon: 'contact', w: 460, h: 340 },
   project: { title: 'Project', icon: 'doc', w: 620, h: 560 },
+  papers: { title: 'Papers', icon: 'doc', w: 600, h: 480 },
 }
 
-const DESKTOP_ICONS: { app: AppId; label: string; icon: IconKind }[] = [
-  { app: 'finder', label: 'Projects', icon: 'folder' },
-  { app: 'about', label: 'About Me', icon: 'about' },
-  { app: 'resume', label: 'Resume.pdf', icon: 'pdf' },
-  { app: 'credentials', label: 'Credentials', icon: 'credentials' },
-  { app: 'tagabaybay', label: 'TagaBaybay', icon: 'tagabaybay' },
-]
+type Icon = { app: AppId; label: string; icon: IconKind; arg?: string }
 
-const DOCK: AppId[] = ['finder', 'about', 'tagabaybay', 'terminal', 'films', 'contact']
+const SETUP: Record<DesktopMode, { icons: Icon[]; dock: AppId[]; hello: string; name: string; line: string; tip: string }> = {
+  work: {
+    icons: [
+      { app: 'finder', label: 'Projects', icon: 'folder' },
+      { app: 'about', label: 'About Me', icon: 'about' },
+      { app: 'resume', label: 'Resume.pdf', icon: 'pdf' },
+      { app: 'credentials', label: 'Credentials', icon: 'credentials' },
+      { app: 'contact', label: 'Contact', icon: 'contact' },
+    ],
+    dock: ['finder', 'about', 'resume', 'credentials', 'films', 'contact'],
+    hello: 'Hi, I’m',
+    name: 'Jaztin.',
+    line: 'This is the work screen: what I build, and how to reach me.',
+    tip: 'Open Projects to start · the MacBook next to me is the research lab.',
+  },
+  lab: {
+    icons: [
+      { app: 'tagabaybay', label: 'TagaBaybay', icon: 'tagabaybay' },
+      { app: 'papers', label: 'Papers', icon: 'doc' },
+      { app: 'project', label: 'Thesis', icon: 'folder', arg: 'avsr-pipeline' },
+      { app: 'terminal', label: 'Terminal', icon: 'terminal' },
+    ],
+    dock: ['tagabaybay', 'papers', 'terminal'],
+    hello: 'The',
+    name: 'Lab.',
+    line: 'Filipino NLP research: how English words get respelled in Filipino, and speech data for code-switched talk.',
+    tip: 'TagaBaybay is open — type any English word.',
+  },
+}
 
 type Props = {
   clock: string
@@ -49,9 +78,11 @@ type Props = {
   night: boolean
   initialApp?: AppId
   onExit: () => void
+  mode: DesktopMode
 }
 
-export default function Desktop({ clock, weather, night, initialApp, onExit }: Props) {
+export default function Desktop({ clock, weather, night, initialApp, onExit, mode }: Props) {
+  const setup = SETUP[mode]
   const [wins, setWins] = useState<Win[]>([])
   const zTop = useRef(10)
   const count = useRef(0)
@@ -86,17 +117,19 @@ export default function Desktop({ clock, weather, night, initialApp, onExit }: P
 
   useEffect(() => {
     if (initialApp) open(initialApp)
-  }, [initialApp, open])
+    else if (mode === 'lab') open('tagabaybay') // the lab opens with the experiment running
+  }, [initialApp, open, mode])
 
   const active = wins.filter((w) => !w.minimized).sort((a, b) => b.z - a.z)[0]
   const activeTitle = active ? titleFor(active) : 'Finder'
 
   return (
-    <div className={`desktop${night ? ' desktop--night' : ''}`}>
+    <div className={`desktop desktop--${mode}${night ? ' desktop--night' : ''}`}>
       <div className="menubar">
         <span className="menubar__logo" aria-hidden>
-          ●
+          {mode === 'lab' ? '◆' : '●'}
         </span>
+        <span className="menubar__mode">{mode === 'lab' ? 'Lab' : 'Work'}</span>
         <b>{activeTitle}</b>
         <span className="menubar__item hide-sm">File</span>
         <span className="menubar__item hide-sm">View</span>
@@ -114,8 +147,8 @@ export default function Desktop({ clock, weather, night, initialApp, onExit }: P
       </div>
 
       <div className="desk-icons">
-        {DESKTOP_ICONS.map((i) => (
-          <button key={i.app} className="desk-icon" onClick={() => open(i.app)}>
+        {setup.icons.map((i) => (
+          <button key={i.label} className="desk-icon" onClick={() => open(i.app, i.arg)}>
             <AppIcon kind={i.icon} size={54} />
             <span>{i.label}</span>
           </button>
@@ -124,10 +157,10 @@ export default function Desktop({ clock, weather, night, initialApp, onExit }: P
 
       <div className="desktop__watermark">
         <div className="desktop__hello">
-          Hi, I&rsquo;m <em>{profile.shortName}.</em>
+          {setup.hello} <em>{setup.name}</em>
         </div>
-        <div>{profile.headline}</div>
-        <div className="desktop__tip">Open a folder to explore, or try TagaBaybay in the dock.</div>
+        <div>{setup.line}</div>
+        <div className="desktop__tip">{setup.tip}</div>
       </div>
 
       {wins.map((w) => (
@@ -148,7 +181,7 @@ export default function Desktop({ clock, weather, night, initialApp, onExit }: P
       ))}
 
       <nav className="dock" aria-label="Dock">
-        {DOCK.map((app) => {
+        {setup.dock.map((app) => {
           const running = wins.some((w) => w.app === app)
           return (
             <button key={app} className="dock__item" onClick={() => open(app)} title={META[app].title}>
@@ -193,6 +226,8 @@ function AppBody({ win, open, onExit }: { win: Win; open: OpenApp; onExit: () =>
       return <ContactApp />
     case 'project':
       return <ProjectApp id={win.arg ?? ''} open={open} />
+    case 'papers':
+      return <PapersApp />
   }
 }
 

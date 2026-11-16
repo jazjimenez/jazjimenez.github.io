@@ -2,8 +2,9 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Environment, Lightformer, useCursor } from '@react-three/drei'
 import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
+import { CapizChandelier, Clapperboard, FairyLights, NeonFlag, Projector, Sungka } from './props2'
 import FirstPersonRig, { type IntroMode, type LaptopMode } from './FirstPersonRig'
 import { activeScreen, type FocusId, type ScreenId } from './screenPortal'
 import { onLiveTextureChange } from './liveTextures'
@@ -14,7 +15,6 @@ import {
   Bed,
   Bookshelf,
   CapizWindow,
-  CeilingLight,
   Certificates,
   Desk,
   DeskLamp,
@@ -57,7 +57,16 @@ type Props = {
   onArrived: () => void
   onEnteredLaptop: () => void
   onLeftLaptop: () => void
-  onOpenLaptop: () => void
+  /** Lean in to a screen: the monitor is the Work desktop, the MacBook is the Lab. */
+  onOpenLaptop: (screen: ScreenId) => void
+  /** Which screen the desktop is shown on (and the camera leans in to). */
+  screen: ScreenId
+  /** Highlight this object's label (the guided commentary points things out), or null. */
+  hintId: string | null
+  /** Called whenever an object is clicked, for the "scenes found" tracker. */
+  onDiscover: (id: string) => void
+  /** The room has loaded and is on screen. */
+  onReady?: () => void
   /** Zoomed in on something from the chair (the corkboard), or null. */
   focus: FocusId | null
   onFocus: (f: FocusId | null) => void
@@ -94,6 +103,8 @@ function useBakedAvailable() {
 }
 
 export default function Room(props: Props) {
+  // the camera rig reads this when leaning in, so keep it in step with the app before any frame runs
+  activeScreen.id = props.screen
   const [tier, setTier] = useState<Tier>(START_TIER)
   const baked = useBakedAvailable()
   if (baked === null) return <div className="room" />
@@ -123,11 +134,23 @@ export default function Room(props: Props) {
 
 const NO_CLICKS: ClickSpec[] = []
 
-/** Open the desktop on the screen you clicked (the monitor or the MacBook). */
+/** Tell the app once the scene is mounted (i.e. everything it suspended on has loaded). */
+function useReady(onReady?: () => void) {
+  const cb = useRef(onReady)
+  cb.current = onReady
+  useEffect(() => {
+    cb.current?.()
+  }, [])
+}
+
+/** Open the desktop on the screen you clicked: the monitor (Work) or the MacBook (Lab). */
 function openOn(p: Props, id: ScreenId) {
   activeScreen.id = id
-  p.onOpenLaptop()
+  p.onOpenLaptop(id)
 }
+
+/** Lets every clickable object know what's being pointed out, and report when it's clicked. */
+const GuideCtx = createContext<{ hintId: string | null; onDiscover: (id: string) => void }>({ hintId: null, onDiscover: () => {} })
 
 function lampLabel(p: Props) {
   if (!p.night) return 'Desk lamp — click for a cozy night'
@@ -136,10 +159,11 @@ function lampLabel(p: Props) {
 
 /** Baked room: same camera, sunbeams and interactions, but all lighting comes from the lightmaps. */
 function BakedRoomScene(p: Props) {
+  useReady(p.onReady)
   const [playing, setPlaying] = useState(false)
   const clickables: ClickSpec[] = [
-    { id: 'monitor', label: 'Open my computer', labelY: 0.62, hint: p.laptopMode === 'seat' && p.intro === 'done' && !p.focus, onClick: () => openOn(p, 'monitor') },
-    { id: 'laptop', label: 'My MacBook', labelY: 0.36, onClick: () => openOn(p, 'laptop') },
+    { id: 'monitor', label: 'Work — projects & résumé', labelY: 0.62, hint: p.laptopMode === 'seat' && p.intro === 'done' && !p.focus && !p.hintId, onClick: () => openOn(p, 'monitor') },
+    { id: 'laptop', label: 'Lab — Filipino NLP research', labelY: 0.36, onClick: () => openOn(p, 'laptop') },
     { id: 'cork', label: 'Corkboard — take a closer look', labelY: 0.45, onClick: () => p.onFocus('cork') },
     { id: 'jeepney', label: 'Jeepney', labelY: 0.3, onClick: () => p.onExtra('jeepney') },
     { id: 'credentials', label: 'Certificates — take a closer look', labelY: 0.32, onClick: () => p.onFocus('certs') },
@@ -164,12 +188,39 @@ function BakedRoomScene(p: Props) {
       <FirstPersonRig mode={p.laptopMode} onEntered={p.onEnteredLaptop} onLeft={p.onLeftLaptop} look={p.look} onLookRequest={p.onLookRequest} intro={p.intro} onArrived={p.onArrived} focus={p.focus} />
       <EnvironmentLight night={p.night} />
       <SunShafts strength={p.night ? 0 : p.rainy ? 0.3 : 1} />
-      <BakedScene night={p.night} cozy={p.cozy} rainy={p.rainy} playing={playing} clickables={p.intro === 'done' ? clickables : NO_CLICKS} cutaway={p.intro !== 'done'} />
+      <BakedScene
+        night={p.night}
+        cozy={p.cozy}
+        rainy={p.rainy}
+        playing={playing}
+        clickables={
+          p.intro === 'done'
+            ? clickables.map((c) => ({
+                ...c,
+                hint: c.hint || c.id === p.hintId,
+                onClick: () => {
+                  p.onDiscover(c.id)
+                  c.onClick()
+                },
+              }))
+            : NO_CLICKS
+        }
+        cutaway={p.intro !== 'done'}
+      />
     </>
   )
 }
 
 function Scene(p: Props) {
+  return (
+    <GuideCtx.Provider value={{ hintId: p.hintId, onDiscover: p.onDiscover }}>
+      <SceneObjects {...p} />
+    </GuideCtx.Provider>
+  )
+}
+
+function SceneObjects(p: Props) {
+  useReady(p.onReady)
   const clockFace = useMemo(() => clockFaceTexture(), [])
   const invalidate = useThree((s) => s.invalidate)
   // posters / corkboard photos arrive after load: redraw once they do
@@ -182,15 +233,35 @@ function Scene(p: Props) {
 
       <Shell night={p.night} rainy={p.rainy} cutaway={p.intro !== 'done'} />
       <SunShafts strength={p.night ? 0 : p.rainy ? 0.3 : 1} />
-      <CeilingLight on={p.night && !p.cozy} />
+      <CapizChandelier on={p.night && !p.cozy} />
+      {/* string lights with polaroids, high across the back wall */}
+      <group position={[0, 2.62, -2.975]}>
+        <FairyLights lit={p.night && !p.cozy} from={-2.7} to={1.05} sag={0.14} photos={[0.16, 0.36, 0.58, 0.8]} />
+      </group>
+      {/* neon of the flag's triangle, sun and stars, above the bookshelf */}
+      <group position={[2.965, 2.42, -1.0]} rotation={[0, -Math.PI / 2, 0]} visible={p.intro === 'done'}>
+        <NeonFlag lit={p.night && !p.cozy} />
+      </group>
+      {/* a sungka board on the floor under the window, mid-game */}
+      <group position={[-2.55, 0, -0.5]} rotation={[0, Math.PI / 2 - 0.12, 0]}>
+        <Sungka />
+      </group>
+      {/* the projector on the record cabinet, lens to the room */}
+      <group position={[1.6, 0.62, -2.62]} rotation={[0, Math.PI / 2, 0]} scale={0.85}>
+        <Projector />
+      </group>
+      {/* a slate leaning on the wall at the desk's corner */}
+      <group position={[0.86, 0.75, -2.935]} rotation={[-0.14, -0.18, 0]}>
+        <Clapperboard />
+      </group>
 
       {/* the desk in front of you */}
       <Desk />
       {/* my actual setup: monitor in the middle, the MacBook on a stand, keyboard, mouse */}
-      <Clickable id="monitor" position={[0.08, 0.75, -2.8]} label="Open my computer" onClick={() => openOn(p, 'monitor')} hint={p.laptopMode === 'seat' && p.intro === 'done' && !p.focus} labelY={0.62}>
+      <Clickable id="monitor" position={[0.08, 0.75, -2.8]} label="Work — projects & résumé" onClick={() => openOn(p, 'monitor')} hint={p.laptopMode === 'seat' && p.intro === 'done' && !p.focus && !p.hintId} labelY={0.62}>
         <Monitor />
       </Clickable>
-      <Clickable id="laptop" position={[-0.4, 0.75, -2.64]} label="My MacBook" onClick={() => openOn(p, 'laptop')} labelY={0.36}>
+      <Clickable id="laptop" position={[-0.4, 0.75, -2.64]} label="Lab — Filipino NLP research" onClick={() => openOn(p, 'laptop')} labelY={0.36}>
         <group rotation={[0, 0.5, 0]}>
           <LaptopOnStand />
         </group>
@@ -222,7 +293,7 @@ function Scene(p: Props) {
         <PaperStack />
       </Clickable>
       <MonoblocChair />
-      <Clickable id="jeepney" position={[0.72, 0.75, -2.86]} label="Jeepney" onClick={() => p.onExtra('jeepney')} labelY={0.3}>
+      <Clickable id="jeepney" position={[0.52, 0.75, -2.84]} label="Jeepney" onClick={() => p.onExtra('jeepney')} labelY={0.3}>
         <Jeepney />
       </Clickable>
       {/* eye level above the record cabinet, so they're readable from the chair (click to zoom in) */}
@@ -255,7 +326,10 @@ function Scene(p: Props) {
       >
         <RecordPlayer playing={playing} />
       </Clickable>
-      <Bookshelf />
+      {/* on the right wall, which the welcome page's cutaway removes */}
+      <group visible={p.intro === 'done'}>
+        <Bookshelf />
+      </group>
       <Clickable id="guitar" position={[1.6, 0, -0.05]} label="Guitar" onClick={() => p.onExtra('guitar')} labelY={1.15}>
         <GuitarStandIn />
       </Clickable>
@@ -406,6 +480,8 @@ function Clickable({
   labelY?: number
   hint?: boolean
 }) {
+  const guide = useContext(GuideCtx)
+  hint = hint || guide.hintId === id
   const ref = useRef<THREE.Group>(null!)
   const [hover, setHover] = useState(false)
   useCursor(hover)
@@ -455,6 +531,7 @@ function Clickable({
       onClick={(e) => {
         e.stopPropagation()
         setHover(false)
+        guide.onDiscover(id)
         onClick()
       }}
     >

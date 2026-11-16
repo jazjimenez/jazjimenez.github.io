@@ -231,6 +231,9 @@ def setup_day():
     emission('emit_parol', (1, 0.6, 0.2), 0)
     emission('emit_ceiling', (1, 0.85, 0.6), 0)
     emission('emit_bulb', (1, 0.8, 0.5), 0)
+    emission('emit_neon', (1, 0.8, 0.3), 0)
+    emission('emit_fairy', (1, 0.7, 0.35), 0)
+    emission('emit_bedglow', (1, 0.78, 0.5), 0)
 
 def screen_lights(power):
     """The monitor and the MacBook screens glow a cool white onto the keyboard, desk and your face."""
@@ -278,9 +281,31 @@ def setup_night(cozy=False):
     if cozy:
         emission('emit_parol', (1, 0.6, 0.2), 0)
         emission('emit_ceiling', (1, 0.85, 0.6), 0)
+        emission('emit_neon', (1, 0.8, 0.3), 0)
+        emission('emit_fairy', (1, 0.7, 0.35), 0)
+        emission('emit_bedglow', (1, 0.78, 0.5), 0)
         return
-    ceil = world_pos('emit_ceiling', b(0, 2.97, 0))
-    add_light('AREA', 'ceiling_light', ceil + Vector((0, 0, -0.05)), 140, (1.0, 0.82, 0.6), size=0.5, direction=Vector((0, 0, -1)))
+    # the capiz chandelier: a bare bulb hanging inside rings of shells, so it shines every way and
+    # the shells throw their dappled shadows across the ceiling and walls
+    ceil = world_pos('emit_ceiling', b(0, 2.59, 0))
+    add_light('POINT', 'ceiling_light', ceil, 170, (1.0, 0.82, 0.6), size=0.05)
+    # neon flag and fairy lights: small warm sources so their glow lands on the walls cleanly
+    neon = world_pos('emit_neon', None)
+    if neon is not None:
+        add_light('POINT', 'neon', neon + Vector((-0.2, 0, 0)), 6, (1.0, 0.78, 0.3), size=0.2)
+        emission('emit_neon', (1, 0.8, 0.3), 12)
+    fairy = world_pos('emit_fairy', None)
+    if fairy is not None:
+        for x in (-2.2, -1.2, -0.2, 0.7):
+            add_light('POINT', f'fairy_{x}', b(x, 2.45, -2.82), 1.6, (1.0, 0.68, 0.35), size=0.05)
+        emission('emit_fairy', (1, 0.7, 0.35), 10)
+    # the bed's LED strip: a warm pool on the floor around the floating base
+    glow = world_pos('emit_bedglow', None)
+    if glow is not None:
+        for dx in (-0.5, 0.5):
+            for dy in (-0.6, 0.6):
+                add_light('POINT', f'bedglow_{dx}_{dy}', glow + Vector((dx, dy, -0.05)), 2.2, (1.0, 0.75, 0.45), size=0.05)
+        emission('emit_bedglow', (1, 0.78, 0.5), 9)
     parol = world_pos('emit_parol', b(-2.2, 2.4, -1.9))
     add_light('POINT', 'parol', parol, 18, (1.0, 0.55, 0.2), size=0.15)
     emission('emit_parol', (1, 0.6, 0.2), 6)
@@ -470,6 +495,9 @@ for mat, n in bake_nodes:
 emission('emit_parol', (1, 0.6, 0.2), 0)
 emission('emit_ceiling', (1, 0.85, 0.6), 0)
 emission('emit_bulb', (1, 0.8, 0.5), 0)
+emission('emit_neon', (1, 0.8, 0.3), 0)
+emission('emit_fairy', (1, 0.7, 0.35), 0)
+emission('emit_bedglow', (1, 0.78, 0.5), 0)
 clear_lights()
 
 bpy.ops.export_scene.gltf(

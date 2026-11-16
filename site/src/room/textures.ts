@@ -1,8 +1,10 @@
 import * as THREE from 'three'
+import { projects } from '../data/content'
+import { pub } from '../data/publish'
 
 // Small canvas-drawn textures, so the room needs no image files.
 
-function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
+export function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
   const c = document.createElement('canvas')
   c.width = w
   c.height = h
@@ -519,122 +521,136 @@ export function normalMapFor(src: THREE.Texture, strength = 2) {
 }
 
 /** The MacBook's screen: a dark code editor with a SQL query open. */
+/** The MacBook = the Lab: TagaBaybay running in a terminal, respelling English loanwords. */
 export function codeEditorTexture() {
   return canvasTexture(1024, 640, (g) => {
-    g.fillStyle = '#1e1f29'
+    g.fillStyle = '#0f1416'
     g.fillRect(0, 0, 1024, 640)
-    g.fillStyle = '#171820' // title bar + sidebar
-    g.fillRect(0, 0, 1024, 34)
-    g.fillRect(0, 34, 200, 606)
+    // title bar
+    g.fillStyle = '#1b2226'
+    g.fillRect(0, 0, 1024, 40)
     ;['#ff5f57', '#febc2e', '#28c840'].forEach((c, i) => {
       g.fillStyle = c
       g.beginPath()
-      g.arc(22 + i * 22, 17, 7, 0, Math.PI * 2)
+      g.arc(24 + i * 22, 20, 7, 0, Math.PI * 2)
       g.fill()
     })
-    g.font = '15px JetBrains Mono, monospace'
-    g.fillStyle = '#8b8fa3'
-    ;['▾ tagabaybay', '   src/', '   ▸ adaptation', '   lib.rs', '▾ thesis-pipeline', '   schema.sql', '   align.py', '   README.md'].forEach((t, i) => g.fillText(t, 16, 70 + i * 26))
-    const code: [string, string][][] = [
-      [['-- speakers & clips for the AVSR dataset', '#6a7088']],
-      [['CREATE TABLE ', '#c792ea'], ['clips', '#82aaff'], [' (', '#c8cce0']],
-      [['  id          ', '#c8cce0'], ['BIGSERIAL PRIMARY KEY', '#ffcb6b'], [',', '#c8cce0']],
-      [['  speaker_id  ', '#c8cce0'], ['INT REFERENCES ', '#c792ea'], ['speakers', '#82aaff'], [',', '#c8cce0']],
-      [['  lang        ', '#c8cce0'], ['TEXT CHECK', '#ffcb6b'], [" (lang IN ('fil','en','taglish'))", '#c3e88d'], [',', '#c8cce0']],
-      [['  start_ms    ', '#c8cce0'], ['INT', '#ffcb6b'], [', end_ms ', '#c8cce0'], ['INT', '#ffcb6b']],
-      [[');', '#c8cce0']],
-      [['', '#c8cce0']],
-      [['SELECT ', '#c792ea'], ['lang, ', '#c8cce0'], ['count', '#82aaff'], ['(*), ', '#c8cce0'], ['sum', '#82aaff'], ['(end_ms - start_ms) / 3.6e6 ', '#c8cce0'], ['AS ', '#c792ea'], ['hours', '#c8cce0']],
-      [['FROM ', '#c792ea'], ['clips ', '#c8cce0'], ['GROUP BY ', '#c792ea'], ['lang;', '#c8cce0']],
+    g.fillStyle = 'rgba(220,235,230,.6)'
+    g.font = '500 16px "JetBrains Mono", monospace'
+    g.textAlign = 'center'
+    g.fillText('lab — tagabaybay — zsh', 512, 26)
+    g.textAlign = 'left'
+    // the "LAB" tag
+    g.fillStyle = '#2f8f7a'
+    g.fillRect(900, 8, 104, 24)
+    g.fillStyle = '#0f1416'
+    g.font = '700 14px "JetBrains Mono", monospace'
+    g.fillText('◆ LAB', 926, 25)
+    g.font = '500 21px "JetBrains Mono", monospace'
+    let y = 84
+    const line = (parts: [string, string][]) => {
+      let x = 34
+      for (const [txt, col] of parts) {
+        g.fillStyle = col
+        g.fillText(txt, x, y)
+        x += g.measureText(txt).width
+      }
+      y += 34
+    }
+    line([['jaztin@kwarto ', '#7fd1b9'], ['~/tagabaybay ', '#8ab4f8'], ['$ ', '#cfd8dc'], ['cargo run -- nativize --trace', '#e8eef0']])
+    line([['   Compiling tagabaybay v0.4.0', '#6c7a80']])
+    line([['    Finished release in 2.41s', '#6c7a80']])
+    y += 6
+    const words: [string, string][] = [
+      ['computer', 'kompyuter'],
+      ['schedule', 'iskedyul'],
+      ['basketball', 'basketbol'],
+      ['traffic', 'trapik'],
+      ['straight', 'istreyt'],
+      ['xylophone', 'saylopon'],
+      ['amoxicillin', 'amoksisilin'],
     ]
-    g.font = '17px JetBrains Mono, monospace'
-    code.forEach((line, i) => {
-      let x = 260
-      const y = 74 + i * 30
-      g.fillStyle = '#4b4f63'
-      g.fillText(String(i + 1).padStart(2, ' '), 214, y)
-      for (const [t, c] of line) {
+    for (const [en, fil] of words) line([['  ' + en.padEnd(13), '#cfd8dc'], ['→  ', '#f2a93b'], [fil, '#7fe0b4']])
+    y += 6
+    line([['  7/7 nativized · CER 3.34% on the gold set', '#6c7a80']])
+    line([['jaztin@kwarto ', '#7fd1b9'], ['~/tagabaybay ', '#8ab4f8'], ['$ ', '#cfd8dc'], ['█', '#7fe0b4']])
+  })
+}
+
+/** The monitor = Work: a database client querying my projects (the real ones, from content.ts). */
+export function monitorTexture() {
+  const rows = projects.map((p) => [p.title, pub(p.role) || '—', pub(p.year) || '—', pub(p.status) || 'shipped'])
+  const draw = (g: CanvasRenderingContext2D) => {
+    g.fillStyle = '#161210'
+    g.fillRect(0, 0, 1024, 576)
+    // window chrome
+    g.fillStyle = '#231b17'
+    g.fillRect(0, 0, 1024, 34)
+    ;['#ff5f57', '#febc2e', '#28c840'].forEach((c, i) => {
+      g.fillStyle = c
+      g.beginPath()
+      g.arc(20 + i * 20, 17, 6, 0, Math.PI * 2)
+      g.fill()
+    })
+    g.fillStyle = 'rgba(244,234,216,.6)'
+    g.font = '500 14px "JetBrains Mono", monospace'
+    g.textAlign = 'center'
+    g.fillText('kwarto_db — psql', 512, 22)
+    g.textAlign = 'left'
+    g.fillStyle = '#ff4a2b'
+    g.fillRect(890, 6, 120, 22)
+    g.fillStyle = '#161210'
+    g.font = '700 13px "JetBrains Mono", monospace'
+    g.fillText('● WORK', 920, 22)
+    // the query
+    g.font = '500 19px "JetBrains Mono", monospace'
+    const kw = '#f2a93b'
+    const tx = '#f4ead8'
+    let y = 74
+    const put = (parts: [string, string][]) => {
+      let x = 28
+      for (const [t, c] of parts) {
         g.fillStyle = c
         g.fillText(t, x, y)
         x += g.measureText(t).width
       }
-    })
-    g.fillStyle = '#ffcb6b' // cursor
-    g.fillRect(560, 345, 2, 22)
-    g.fillStyle = '#12131a' // terminal panel
-    g.fillRect(200, 470, 824, 170)
-    g.fillStyle = '#7fe0a0'
-    g.font = '15px JetBrains Mono, monospace'
-    g.fillText('$ cargo test --test eval', 220, 500)
-    g.fillStyle = '#c8cce0'
-    g.fillText('5-vowel CER 3.34%   3-vowel CER 2.63%   ✓ 2319 pairs', 220, 528)
-  })
-}
-
-/** The external monitor: wallpaper + dock, like the real desktop (16:9). */
-export function monitorTexture() {
-  // Matches the desktop's darkroom wallpaper (index.css .desktop), so leaning in is seamless.
-  const draw = (g: CanvasRenderingContext2D) => {
-    g.fillStyle = '#1d1410'
-    const base = g.createLinearGradient(0, 0, 1024, 576)
-    base.addColorStop(0, '#1d1410')
-    base.addColorStop(0.55, '#3a2116')
-    base.addColorStop(1, '#6b3a1c')
-    g.fillStyle = base
-    g.fillRect(0, 0, 1024, 576)
-    const glow = (x: number, y: number, r: number, color: string) => {
-      const gr = g.createRadialGradient(x, y, 0, x, y, r)
-      gr.addColorStop(0, color)
-      gr.addColorStop(1, 'rgba(0,0,0,0)')
-      g.fillStyle = gr
-      g.fillRect(0, 0, 1024, 576)
+      y += 28
     }
-    glow(120, 640, 620, 'rgba(242,169,59,.9)')
-    glow(1060, -40, 480, 'rgba(255,74,43,.55)')
-    g.fillStyle = 'rgba(244,234,216,.06)'
-    g.font = 'italic 400 330px "Instrument Serif", Georgia, serif'
-    g.fillText('Kwarto', 300, 600)
-    g.fillStyle = 'rgba(11,10,9,.55)'
-    g.fillRect(0, 0, 1024, 26)
-    g.fillStyle = '#ff4a2b'
-    g.beginPath()
-    g.arc(22, 13, 5, 0, Math.PI * 2)
-    g.fill()
-    g.fillStyle = '#f4ead8'
-    g.font = '600 15px Inter, sans-serif'
-    g.fillText('Jaztin', 36, 18)
-    ;['#4a8ad8', '#ffffff', '#ffffff', '#4a8ad8', '#2e6b5e'].forEach((c, i) => {
-      g.fillStyle = c
-      g.beginPath()
-      g.roundRect(950, 52 + i * 78, 50, 46, 9)
-      g.fill()
-    })
-    g.fillStyle = 'rgba(11,10,9,.45)'
-    g.beginPath()
-    g.roundRect(330, 512, 364, 52, 14)
-    g.fill()
-    ;['#4a8ad8', '#f6efe3', '#2e6b5e', '#222', '#c0392b', '#e8a33a'].forEach((c, i) => {
-      g.fillStyle = c
-      g.beginPath()
-      g.roundRect(344 + i * 58, 520, 40, 36, 9)
-      g.fill()
-    })
-    g.fillStyle = '#f4ead8'
-    g.font = '400 76px "Instrument Serif", Georgia, serif'
-    g.fillText('Hi, I\u2019m', 70, 372)
-    const w = g.measureText('Hi, I\u2019m ').width
+    put([['kwarto_db=# ', '#8a7f72'], ['SELECT ', kw], ['title, role, year, status', tx]])
+    put([['kwarto_db-# ', '#8a7f72'], ['  FROM ', kw], ['projects', tx]])
+    put([['kwarto_db-# ', '#8a7f72'], [' ORDER BY ', kw], ['year ', tx], ['DESC', kw], [';', tx]])
+    y += 10
+    // result table
+    const cols = [28, 380, 760, 840]
+    const cut = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + '…' : t)
+    g.font = '600 17px "JetBrains Mono", monospace'
     g.fillStyle = '#f2a93b'
-    g.font = 'italic 400 76px "Instrument Serif", Georgia, serif'
-    g.fillText('Jaztin.', 70 + w, 372)
-    g.font = '500 18px "JetBrains Mono", monospace'
-    g.fillStyle = 'rgba(244,234,216,.75)'
-    g.fillText('CLICK TO OPEN MY COMPUTER', 72, 414)
+    ;['title', 'role', 'year', 'status'].forEach((h, i) => g.fillText(h, cols[i], y))
+    y += 10
+    g.fillStyle = 'rgba(244,234,216,.25)'
+    g.fillRect(28, y, 968, 1.5)
+    y += 28
+    g.font = '500 17px "JetBrains Mono", monospace'
+    for (const r of rows) {
+      g.fillStyle = tx
+      g.fillText(cut(r[0], 30), cols[0], y)
+      g.fillStyle = 'rgba(244,234,216,.75)'
+      g.fillText(cut(r[1], 31), cols[1], y)
+      g.fillText(cut(r[2], 6), cols[2], y)
+      g.fillStyle = '#7fe0b4'
+      g.fillText(cut(r[3], 14), cols[3], y)
+      y += 30
+    }
+    g.fillStyle = '#8a7f72'
+    g.fillText(`(${rows.length} rows)`, 28, y + 6)
+    // footer prompt
+    g.fillStyle = 'rgba(244,234,216,.85)'
+    g.font = '500 16px "JetBrains Mono", monospace'
+    g.fillText('CLICK TO OPEN MY WORK — PROJECTS · RÉSUMÉ · CREDENTIALS', 28, 548)
   }
   const tex = canvasTexture(1024, 576, draw)
-  // redraw once the display font has loaded (the first draw may have used the fallback)
-  document.fonts?.load('76px "Instrument Serif"').then(() => {
-    const canvas = tex.image as HTMLCanvasElement
-    const g = canvas.getContext('2d')
+  document.fonts?.load('500 19px "JetBrains Mono"').then(() => {
+    const g = (tex.image as HTMLCanvasElement).getContext('2d')
     if (!g) return
     draw(g)
     tex.needsUpdate = true

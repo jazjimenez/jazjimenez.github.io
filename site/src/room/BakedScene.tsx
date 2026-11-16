@@ -29,6 +29,9 @@ const HOT: Record<string, THREE.Color> = {
   emit_parol: new THREE.Color(3.2, 1.7, 0.5),
   emit_bulb: new THREE.Color(6, 4.2, 2.2),
   emit_ceiling: new THREE.Color(2.4, 2.05, 1.6),
+  emit_neon: new THREE.Color(3.4, 2.6, 0.9),
+  emit_fairy: new THREE.Color(3.2, 2.0, 0.9),
+  emit_bedglow: new THREE.Color(3.0, 2.2, 1.3),
 }
 const SKY_DAY = new THREE.Color(1.7, 1.7, 1.7)
 const SKY_NIGHT = new THREE.Color(1, 1, 1)
@@ -93,7 +96,9 @@ export default function BakedScene({ night, cozy, rainy, playing, clickables, cu
       const alongZ = dims.z > 5 && dims.x < 0.08 && box.min.x > 2.9
       // …and things standing against the front wall (wardrobe, door, clock) whose backs would face the camera
       const againstFrontWall = (box.min.z + box.max.z) / 2 > 2.35
-      if (alongX || alongZ || againstFrontWall) cutawayTrim.push(mesh)
+      // …and things mounted on the right wall (bookshelf, neon), which would float where that wall is cut away
+      const onRightWall = box.min.x > 2.6
+      if (alongX || alongZ || againstFrontWall || onRightWall) cutawayTrim.push(mesh)
       if (tagged(mesh, 'nobake_outside')) {
         outside = mesh
         return

@@ -882,6 +882,49 @@ code,
   --line: #e6ddd0;
   --chip: #f1eadf;
 }
+/* the Lab (MacBook): deep teal research-at-night, with a faint baybayin letter */
+.desktop--lab {
+  background: radial-gradient(ellipse at 85% 110%, rgba(47, 143, 122, 0.85) 0%, transparent 55%),
+    radial-gradient(ellipse at -5% -10%, rgba(242, 169, 59, 0.35) 0%, transparent 45%), linear-gradient(170deg, #071513, #0f2a26 55%, #164039);
+}
+.desktop--lab.desktop--night {
+  background: radial-gradient(ellipse at 85% 110%, rgba(47, 143, 122, 0.55) 0%, transparent 55%),
+    radial-gradient(ellipse at -5% -10%, rgba(242, 169, 59, 0.22) 0%, transparent 45%), linear-gradient(170deg, #040b0a, #0a1c19 55%, #0f2c27);
+}
+.desktop.desktop--lab::before {
+  content: 'ᜊ';
+  font: 400 52vw/1 'Noto Sans Tagalog', var(--display);
+  right: 2vw;
+  bottom: -14vw;
+  color: rgba(127, 224, 180, 0.06);
+}
+.desktop--lab .desktop__hello em {
+  color: #7fe0b4;
+}
+.desktop--lab .menubar__logo {
+  color: #7fe0b4;
+}
+.menubar__mode {
+  font: 500 11px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.papers {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+.papers li {
+  margin-bottom: 18px;
+}
+.papers__title {
+  font-weight: 600;
+  font-size: 16px;
+}
+.papers__authors {
+  font-size: 13.5px;
+  margin-top: 2px;
+}
 .desktop--night {
   background: radial-gradient(ellipse at 12% 112%, rgba(242, 169, 59, 0.5) 0%, transparent 52%),
     radial-gradient(ellipse at 104% -8%, rgba(255, 74, 43, 0.45) 0%, transparent 48%), linear-gradient(160deg, #0b0a09, #1a1210 60%, #2e1a12);
@@ -1936,3 +1979,213 @@ body:has(> #root > .sv) {
   }
 }
 
+
+/* ---------- the guided tour ---------- */
+
+/* director's commentary: burned-in subtitles in my voice */
+.commentary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: min(760px, calc(100vw - 32px));
+  margin-bottom: 6px;
+  text-align: center;
+}
+.commentary__tag {
+  font: 500 10.5px var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tungsten);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+}
+.commentary__line {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: 500 clamp(17px, 2.1vw, 23px) / 1.45 var(--font);
+  color: var(--subtitle);
+}
+.commentary__line span {
+  display: inline;
+  padding: 3px 10px 4px;
+  background: rgba(11, 10, 9, 0.78);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  /* cuts in like real subtitles: no fade, so it can never be caught invisible */
+}
+.commentary__skip {
+  border: 0;
+  background: none;
+  color: rgba(244, 234, 216, 0.6);
+  font: 10.5px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* the scenes slate: a tiny clapperboard counting what you've found */
+.slate-wrap {
+  position: relative;
+}
+.slate {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  border: 1px solid rgba(244, 234, 216, 0.45);
+  background: rgba(11, 10, 9, 0.62);
+  color: var(--cream);
+  font: 500 11px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s;
+}
+.slate > span:last-child {
+  padding: 5px 12px 6px;
+}
+.slate b {
+  color: var(--subtitle);
+  font-weight: 600;
+}
+.slate__stripes {
+  height: 6px;
+  background: repeating-linear-gradient(-55deg, var(--cream) 0 6px, var(--night) 6px 12px);
+}
+.slate--bump {
+  animation: clap 0.7s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes clap {
+  30% {
+    transform: scale(1.18) rotate(-4deg);
+  }
+}
+.callsheet {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 300px;
+  padding: 14px 16px 12px;
+  background: var(--cream);
+  color: var(--night);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: rise 0.25s ease-out;
+  z-index: 20;
+}
+.callsheet__head {
+  margin-bottom: 8px;
+  font: 400 24px var(--display);
+}
+.callsheet ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+.callsheet li {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px dashed rgba(11, 10, 9, 0.15);
+  color: rgba(11, 10, 9, 0.55);
+}
+.callsheet li.is-found {
+  color: var(--night);
+  font-weight: 500;
+}
+.callsheet__mark {
+  width: 14px;
+  color: var(--rec);
+}
+.callsheet__replay {
+  margin-top: 10px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: 500 11px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+/* that's a wrap: the end credits */
+.wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  background: rgba(11, 10, 9, 0.94);
+  color: var(--cream);
+  animation: fade-in 1s ease;
+}
+.wrap__roll {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: min(560px, calc(100vw - 40px));
+  transform: translateX(-50%);
+  text-align: center;
+  animation: roll 22s linear forwards;
+}
+@keyframes roll {
+  to {
+    top: 0;
+    transform: translate(-50%, -12%);
+  }
+}
+.wrap__big {
+  margin: 0;
+  font: italic 400 clamp(54px, 9vw, 96px) / 1 var(--display);
+  color: var(--tungsten);
+}
+.wrap__sub {
+  margin: 10px 0 60px;
+  font: 13px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.wrap dl {
+  margin: 0;
+}
+.wrap dt {
+  margin-top: 26px;
+  font: 500 11px var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(244, 234, 216, 0.55);
+}
+.wrap dd {
+  margin: 6px 0 0;
+  font: 400 26px/1.3 var(--display);
+}
+.wrap__thanks {
+  margin: 70px 0 26px;
+  font: italic 400 30px var(--display);
+}
+.wrap__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.wrap__close {
+  position: absolute;
+  top: 28px;
+  right: 34px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wrap__roll {
+    animation: none;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .slate--bump {
+    animation: none;
+  }
+}

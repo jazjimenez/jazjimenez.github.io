@@ -11,6 +11,7 @@ Local axes (Blender, Z up): the glTF importer turns three.js (x, y, z) into (x, 
   chair — office chair facing +Y (toward the desk), backrest toward -Y
 """
 import bpy, bmesh, math, random
+import numpy as np
 from mathutils import Matrix, Quaternion, Vector
 
 scene = None  # set by replace_all()
@@ -130,75 +131,140 @@ def textured(mats):
 
 # ------------------------------------------------------------------ bed
 
+def inabel_material():
+    """Inabel, the hand-loomed Ilocano cloth: cream ground, rust/indigo/mustard bands, a row of
+    little diamonds. Painted into a real image (glTF can't carry procedural textures to the site)."""
+    W, H = 256, 256
+    cream, rust, indigo, mustard = (lin(c)[:3] for c in ('#efe4cf', '#a8452a', '#2b3a5a', '#d39b2a'))
+    bands = [(0, 18, rust), (18, 24, cream), (24, 30, indigo), (30, 36, cream), (36, 42, mustard),
+             (42, 92, cream), (92, 98, rust), (98, 104, cream), (104, 110, indigo),
+             (110, 146, cream), (146, 152, indigo), (152, 158, cream), (158, 164, rust),
+             (164, 214, cream), (214, 220, mustard), (220, 226, cream), (226, 232, indigo),
+             (232, 238, cream), (238, 256, rust)]
+    px = np.ones((H, W, 4), dtype=np.float32)
+    for y0, y1, c in bands:
+        px[y0:y1, :, :3] = c
+    # diamonds (binakol-ish) woven into the two wide cream fields
+    for cy in (67, 189):
+        for cx in range(8, W, 16):
+            for dy in range(-7, 8):
+                half = 7 - abs(dy)
+                px[cy + dy, max(0, cx - half):cx + half + 1, :3] = rust if (cx // 16) % 2 else indigo
+    # a little thread texture so it reads as cloth, not paint
+    rng = np.random.default_rng(3)
+    px[:, :, :3] *= (0.92 + 0.08 * rng.random((H, W, 1))).astype(np.float32)
+    img = bpy.data.images.new('inabel', W, H, alpha=False)
+    img.pixels.foreach_set(px.ravel())
+    img.pack()
+    m = material('hd_inabel', '#efe4cf', rough=1.0)
+    nt = m.node_tree
+    tex = nt.nodes.new('ShaderNodeTexImage')
+    tex.image = img
+    nt.links.new(tex.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
+    return m
+
+
 def build_bed(empty):
-    clear_children(empty)
-    fabric = material('hd_bed_fabric', '#8f8a82', rough=1.0)
-    metal = material('hd_bed_legs', '#1c1c1e', rough=0.35, metal=0.9)
+    """A low Japandi platform bed: floating light-oak base with a warm LED glow underneath, oak
+    headboard panel with an upholstered cushion, cream duvet, accent pillows and an inabel throw."""
+    mats = clear_children(empty)
+    oak = material('hd_bed_oak', '#c9a37a', rough=0.55, source=textured(mats))
+    if oak.use_nodes:  # the room's wood texture, tinted lighter (oak, not narra)
+        b = oak.node_tree.nodes.get('Principled BSDF')
+        if b and not b.inputs['Base Color'].is_linked:
+            b.inputs['Base Color'].default_value = lin('#c9a37a')
+    plinth_mat = material('hd_bed_plinth', '#1d1a17', rough=0.8)
+    boucle = material('hd_bed_boucle', '#d8cbb6', rough=1.0)
 
-    # modern upholstered platform on slim metal legs
+    # floating platform: a dark recessed plinth under a wide oak frame
     bm = bmesh.new()
-    add_box(bm, (0, 0, 0.195), (1.1, 2.06, 0.25), bevel=0.035, segments=4)
-    # padded headboard panel (+Y) …
-    add_box(bm, (0, 1.065, 0.6), (1.16, 0.07, 1.06), bevel=0.03, segments=4)
-    frame = make_object('hd_bed_frame', bm, fabric, empty)
-    # … with channel-tufted cushions on its front face
+    add_box(bm, (0, 0, 0.055), (0.86, 1.78, 0.11), bevel=0.01)
+    make_object('hd_bed_plinth', bm, plinth_mat, empty)
     bm = bmesh.new()
-    channels = 6
-    cw = 1.08 / channels
-    for i in range(channels):
-        cx = -0.54 + cw * (i + 0.5)
-        verts = bmesh.ops.create_cube(bm, size=1.0)['verts']
-        bmesh.ops.subdivide_edges(bm, edges=list({e for v in verts for e in v.link_edges}), cuts=6, use_grid_fill=True)
-        mine = [v for v in bm.verts if abs(v.co.x) <= 0.5001 and abs(v.co.y) <= 0.5001 and abs(v.co.z) <= 0.5001 and not v.tag]
-        for v in mine:
-            u = v.co.x * 2  # -1..1 across the channel
-            puff = 1 - 0.55 * u * u
-            v.co = Vector((cx + v.co.x * (cw - 0.008), 1.005 + v.co.y * 0.05 * puff, 0.76 + v.co.z * 0.66))
-            v.tag = True
-    edges = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0) > math.radians(55)]
-    bmesh.ops.bevel(bm, geom=edges, offset=0.012, segments=3, profile=0.5, affect='EDGES', clamp_overlap=True)
-    make_object('hd_bed_headboard_cushions', bm, fabric, empty)
-    legs = bmesh.new()
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            add_rod(legs, (sx * 0.46, sy * 0.9, 0.0), (sx * 0.46, sy * 0.9, 0.075), 0.014, segments=12)
-    make_object('hd_bed_legs', legs, metal, empty)
+    add_box(bm, (0, -0.02, 0.19), (1.1, 2.1, 0.16), bevel=0.022, segments=4)
+    frame = make_object('hd_bed_frame', bm, oak, empty)
+    # the LED strip hidden under the overhang (glows at night)
+    bm = bmesh.new()
+    for x in (-0.425, 0.425):
+        add_box(bm, (x, -0.02, 0.105), (0.012, 1.72, 0.008))
+    add_box(bm, (0, -0.885, 0.105), (0.84, 0.012, 0.008))
+    make_object('emit_bedglow', bm, material('hd_bedglow', '#ffd9a8', rough=0.5), empty, smooth=False)
 
-    # mattress: soft rounded block
+    # headboard: a wall panel of oak with a soft bouclé cushion in front
     bm = bmesh.new()
-    add_box(bm, (0, 0, 0.42), (0.95, 1.93, 0.2), bevel=0.045, segments=5)
-    mattress = make_object('hd_bed_mattress', bm, material('hd_mattress', '#f1ede4', rough=0.9), empty)
+    add_box(bm, (0, 1.08, 0.62), (1.08, 0.05, 1.0), bevel=0.012)
+    make_object('hd_bed_headboard', bm, oak, empty)
+    bm = bmesh.new()
+    verts = bmesh.ops.create_cube(bm, size=1.0)['verts']
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=8, use_grid_fill=True)
+    for v in bm.verts:
+        u, w, t = v.co.x * 2, v.co.y * 2, v.co.z * 2
+        puff = (1 - 0.35 * u * u) * (1 - 0.6 * t * t)
+        v.co = Vector((u * 0.47, 1.02 + w * 0.045 * max(puff, 0.25), 0.74 + t * 0.2))
+    bmesh.ops.smooth_vert(bm, verts=bm.verts[:], factor=0.6, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    cushion = make_object('hd_bed_headboard_cushion', bm, boucle, empty)
 
-    # pillows: subdivided boxes puffed in the middle and pinched at the seams
-    pillow_mat = material('hd_pillow', '#fbf8f2', rough=0.95)
-    pillows = []
-    for sx in (-1, 1):
+    # mattress
+    bm = bmesh.new()
+    add_box(bm, (0, -0.01, 0.39), (0.96, 1.96, 0.24), bevel=0.05, segments=5)
+    mattress = make_object('hd_bed_mattress', bm, material('hd_mattress', '#f3efe6', rough=0.9), empty)
+
+    def pillow(name, mat, size, at, tilt_x, turn_z):
         bm = bmesh.new()
-        verts = bmesh.ops.create_cube(bm, size=1.0)['verts']
+        bmesh.ops.create_cube(bm, size=1.0)
         bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=8, use_grid_fill=True)
-        hx, hy, hz = 0.215, 0.165, 0.075
+        hx, hy, hz = size
         for v in bm.verts:
-            u, w, t = v.co.x * 2, v.co.y * 2, v.co.z * 2  # -1..1
+            u, w, t = v.co.x * 2, v.co.y * 2, v.co.z * 2
             puff = (1 - 0.75 * u * u) * (1 - 0.75 * w * w)
             v.co = Vector((u * hx, w * hy, t * hz * max(puff, 0.08)))
         bmesh.ops.smooth_vert(bm, verts=bm.verts[:], factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
-        bmesh.ops.rotate(bm, verts=bm.verts[:], cent=(0, 0, 0), matrix=Matrix.Rotation(math.radians(-14), 3, 'X'))
-        bmesh.ops.rotate(bm, verts=bm.verts[:], cent=(0, 0, 0), matrix=Matrix.Rotation(math.radians(sx * 4), 3, 'Z'))
-        bmesh.ops.translate(bm, vec=Vector((sx * 0.235, 0.73, 0.605)), verts=bm.verts[:])
-        pillows.append(make_object(f'hd_pillow_{"l" if sx < 0 else "r"}', bm, pillow_mat, empty))
+        bmesh.ops.rotate(bm, verts=bm.verts[:], cent=(0, 0, 0), matrix=Matrix.Rotation(math.radians(tilt_x), 3, 'X'))
+        bmesh.ops.rotate(bm, verts=bm.verts[:], cent=(0, 0, 0), matrix=Matrix.Rotation(math.radians(turn_z), 3, 'Z'))
+        bmesh.ops.translate(bm, vec=Vector(at), verts=bm.verts[:])
+        return make_object(name, bm, mat, empty)
 
-    # blanket: a cloth simulation draped over the mattress
+    white = material('hd_pillow', '#fbf8f2', rough=0.95)
+    pillows = [
+        # two sleeping pillows lying flat-ish…
+        pillow('hd_pillow_l', white, (0.21, 0.16, 0.075), (-0.23, 0.74, 0.575), -12, -4),
+        pillow('hd_pillow_r', white, (0.21, 0.16, 0.075), (0.23, 0.74, 0.575), -12, 4),
+        # …two square accent cushions standing against the headboard (terracotta, sage)…
+        pillow('hd_cushion_terracotta', material('hd_cushion_terracotta', '#b5563a', rough=1.0), (0.2, 0.06, 0.2), (-0.22, 0.88, 0.72), -14, 3),
+        pillow('hd_cushion_sage', material('hd_cushion_sage', '#8c9a7c', rough=1.0), (0.2, 0.06, 0.2), (0.22, 0.88, 0.72), -14, -5),
+        # …and a small lumbar one in front, in the inabel weave
+        pillow('hd_cushion_lumbar', inabel_material(), (0.2, 0.07, 0.1), (0.0, 0.62, 0.62), -20, 0),
+    ]
+
+    # duvet: cloth simulation draped over the mattress, with a turned-down fold at the top
     bm = bmesh.new()
-    bmesh.ops.create_grid(bm, x_segments=40, y_segments=40, size=0.5)
-    bmesh.ops.scale(bm, vec=Vector((1.28, 1.24, 1)), verts=bm.verts[:])
-    bmesh.ops.translate(bm, vec=Vector((0, -0.29, 0.62)), verts=bm.verts[:])
-    blanket = make_object('hd_bed_blanket', bm, material('hd_blanket', '#2e6b5e', rough=1.0), empty, smooth=True)
-    drape(blanket, colliders=[mattress, frame] + pillows, frames=45)
-    solid = blanket.modifiers.new('thickness', 'SOLIDIFY')
-    solid.thickness = 0.012
+    bmesh.ops.create_grid(bm, x_segments=44, y_segments=40, size=0.5)
+    bmesh.ops.scale(bm, vec=Vector((1.34, 1.22, 1)), verts=bm.verts[:])
+    bmesh.ops.translate(bm, vec=Vector((0, -0.33, 0.6)), verts=bm.verts[:])
+    duvet = make_object('hd_bed_blanket', bm, material('hd_blanket', '#ece5d8', rough=1.0), empty, smooth=True)
+    drape(duvet, colliders=[mattress, frame] + pillows[:2], frames=45)
+    solid = duvet.modifiers.new('thickness', 'SOLIDIFY')
+    solid.thickness = 0.02
     solid.offset = 1
-    apply_modifiers(blanket)
+    apply_modifiers(duvet)
+    bm = bmesh.new()
+    add_box(bm, (0, 0.27, 0.535), (1.0, 0.16, 0.035), bevel=0.016, segments=4)
+    make_object('hd_bed_fold', bm, material('hd_blanket_fold', '#f5f1e8', rough=1.0), empty)
 
+    # inabel throw folded across the foot, draped over the end of the bed
+    bm = bmesh.new()
+    bmesh.ops.create_grid(bm, x_segments=36, y_segments=16, size=0.5)
+    bmesh.ops.scale(bm, vec=Vector((1.2, 0.5, 1)), verts=bm.verts[:])
+    bmesh.ops.translate(bm, vec=Vector((0, -0.78, 0.68)), verts=bm.verts[:])
+    throw = make_object('hd_bed_throw', bm, inabel_material(), empty, smooth=True, uv_scale=0.5)
+    drape(throw, colliders=[mattress, frame, duvet], frames=40)
+    solid = throw.modifiers.new('thickness', 'SOLIDIFY')
+    solid.thickness = 0.01
+    solid.offset = 1
+    apply_modifiers(throw)
+
+
+# ------------------------------------------------------------------ bed
 
 def drape(cloth, colliders, frames=45):
     """Run Blender's cloth simulation for `frames` frames and freeze the result."""
