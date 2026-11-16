@@ -41,7 +41,7 @@ export const profile = {
   /** Shown as written; the tel: link uses the digits. */
   phone: '+63 928 228 8177',
   links: [
-    { label: 'GitHub', url: 'https://github.com/' }, // TODO: your GitHub profile
+    { label: 'GitHub', url: 'https://github.com/jazjimenez' },
     { label: 'LinkedIn', url: 'https://www.linkedin.com/' }, // TODO: your LinkedIn
   ] as Link[],
   /** Put your resume at site/public/resume.pdf */
@@ -50,7 +50,7 @@ export const profile = {
   siteUrl: 'https://jazjimenez.github.io/',
   /** One-paragraph summary: the first thing a recruiter (or an AI screener) reads. */
   summary:
-    'Computer Science student at De La Salle University focused on backend development and database design, with research in Filipino natural language processing. Co-author of TagaBaybay, a rule-based system for respelling English loanwords in Filipino (paper accepted at IEEE TENCON 2026), and author of an undergraduate thesis building a Filipino-English audio-visual speech dataset pipeline.',
+    'Computer Science student at De La Salle University focused on backend development and database design, with research in Filipino natural language processing. Co-author of TagaBaybay, a rule-based system for respelling English loanwords in Filipino (paper accepted at IEEE TENCON 2026), and author of an undergraduate thesis building a Filipino-English audio-visual speech dataset pipeline. Has also delivered a PostgreSQL-backed database system for a poultry-farm client as QA and analyst on a Scrum team, and built OnRecord, a full-stack music database and forum (Node.js, Express, MongoDB).',
   /** What you're looking for. Text in "(TODO …)" is hidden from the public page. */
   lookingFor: 'Backend, database or data engineering roles — internship or entry-level. (TODO: confirm the role types and your availability date)',
   spokenLanguages: ['English', 'Filipino'],
@@ -60,8 +60,9 @@ export type SkillGroup = { group: string; items: string[] }
 
 /** Skills, grouped. TODO: adjust to what you'd be happy to be interviewed on. */
 export const skills: SkillGroup[] = [
-  { group: 'Backend & data', items: ['Relational database design and modelling', 'SQL', 'Backend development', 'Data pipelines'] },
-  { group: 'Programming languages', items: ['Rust', 'Python', 'SQL', 'TypeScript'] },
+  { group: 'Backend & data', items: ['Relational database design and modelling', 'SQL', 'PostgreSQL', 'MongoDB', 'Node.js / Express', 'Data pipelines'] },
+  { group: 'Programming languages', items: ['Java', 'Kotlin', 'JavaScript', 'TypeScript', 'Rust', 'Python', 'SQL'] },
+  { group: 'Process', items: ['Agile / Scrum', 'Quality assurance and testing', 'Requirements analysis'] },
   { group: 'Research & NLP', items: ['Rule-based NLP', 'Grapheme-to-phoneme conversion', 'Evaluation and error analysis', 'Speech and audio-visual datasets'] },
   { group: 'Tools', items: ['Git and GitHub', 'React', 'Three.js', 'Blender (Python scripting)'] },
 ]
@@ -101,6 +102,43 @@ export const projects: Project[] = [
       { label: 'Project website', url: 'https://mango-cats.github.io/tagabaybay-docs/web/' },
     ],
     app: 'tagabaybay',
+  },
+  {
+    id: 'db-poultry',
+    title: 'DB Poultry',
+    tagline: 'A database management system for a poultry farm in Tanauan City, Batangas',
+    year: '2025',
+    role: 'QA & Analyst · team project, Scrum',
+    status: 'Completed for the client',
+    summary: [
+      'DB Poultry is a poultry farm in Tanauan City, Batangas. Our team built them a desktop application for managing the farm’s records, backed by a PostgreSQL database.',
+      'We ran the project with Scrum, in sprints. As QA and analyst, I worked between the client’s needs and the team’s builds. (TODO: what you analysed and tested — e.g. requirements, test plans, bugs caught)',
+    ],
+    highlights: [
+      'A real client: a working poultry farm in Batangas',
+      'Agile / Scrum team workflow',
+      'TODO: a concrete QA or analysis result you are proud of',
+    ],
+    stack: ['Java', 'Kotlin', 'JavaFX', 'PostgreSQL'],
+    links: [{ label: 'GitHub repository', url: 'https://github.com/DB-Poultry/DB-Poultry' }],
+  },
+  {
+    id: 'onrecord',
+    title: 'OnRecord',
+    tagline: 'A music database and forum site',
+    year: '2025',
+    role: 'Full-stack developer',
+    summary: [
+      'A place to look music up and talk about it: a music database with a community forum on top.',
+      'Built as a server-rendered web app on Node.js and Express, with a MongoDB database through Mongoose, Handlebars templates, and bcrypt-hashed passwords for user accounts.',
+    ],
+    highlights: [
+      'Full stack: database schema, server, and the pages people use',
+      'User accounts with hashed passwords (bcrypt)',
+      'TODO: the feature you built that you are proudest of',
+    ],
+    stack: ['JavaScript', 'Node.js', 'Express', 'MongoDB', 'Mongoose', 'Handlebars', 'bcrypt'],
+    links: [{ label: 'GitHub repository', url: 'https://github.com/jazjimenez/OnRecord' }],
   },
   {
     id: 'avsr-pipeline',
